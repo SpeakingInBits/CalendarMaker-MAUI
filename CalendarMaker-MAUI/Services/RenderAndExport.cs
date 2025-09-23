@@ -33,33 +33,36 @@ public sealed class PdfExportService : IPdfExportService
 
     private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
-
-        var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
-        float pageWpt = (float)wPtD;
-        float pageHpt = (float)hPtD;
-        if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
-
-        // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
-        var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
-
-        var doc = Document.Create(container =>
+        return Task.Run(() =>
         {
-            foreach (var img in rendered)
-            {
-                container.Page(page =>
-                {
-                    page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
-                    page.Margin(0);
-                    page.DefaultTextStyle(x => x.FontSize(12));
-                    page.Content().Image(img).FitArea();
-                });
-            }
-        });
+            QuestPDF.Settings.License = LicenseType.Community;
 
-        using var stream = new MemoryStream();
-        doc.GeneratePdf(stream);
-        return Task.FromResult(stream.ToArray());
+            var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
+            float pageWpt = (float)wPtD;
+            float pageHpt = (float)hPtD;
+            if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
+
+            // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
+            var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
+
+            var doc = Document.Create(container =>
+            {
+                foreach (var img in rendered)
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
+                        page.Margin(0);
+                        page.DefaultTextStyle(x => x.FontSize(12));
+                        page.Content().Image(img).FitArea();
+                    });
+                }
+            });
+
+            using var stream = new MemoryStream();
+            doc.GeneratePdf(stream);
+            return stream.ToArray();
+        });
     }
 
     private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi)

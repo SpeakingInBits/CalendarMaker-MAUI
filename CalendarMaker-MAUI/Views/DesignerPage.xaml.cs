@@ -337,30 +337,63 @@ public partial class DesignerPage : ContentPage
         _canvas.InvalidateSurface();
     }
 
+    private async Task WithBusyButtonAsync(Button? btn, Func<Task> action, string busyText = "Exporting…")
+    {
+        if (btn == null)
+        {
+            await action();
+            return;
+        }
+
+        var originalText = btn.Text;
+        var originalEnabled = btn.IsEnabled;
+        try
+        {
+            btn.IsEnabled = false;
+            btn.Text = busyText;
+            // yield to let UI update the button immediately
+            await Task.Yield();
+            await action();
+        }
+        finally
+        {
+            btn.Text = originalText;
+            btn.IsEnabled = originalEnabled;
+        }
+    }
+
     private async void OnExportClicked(object? sender, EventArgs e)
     {
-        if (_project == null) return;
-        var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
-        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
-        var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
-        await SaveBytesAsync(fileName, bytes);
+        await WithBusyButtonAsync(sender as Button, async () =>
+        {
+            if (_project == null) return;
+            var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
+            var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
+            var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
+            await SaveBytesAsync(fileName, bytes);
+        });
     }
 
     private async void OnExportCoverClicked(object? sender, EventArgs e)
     {
-        if (_project == null)
-            return;
-        var bytes = await _pdf.ExportCoverAsync(_project);
-        var fileName = $"Calendar_{_project.Year}_Cover.pdf";
-        await SaveBytesAsync(fileName, bytes);
+        await WithBusyButtonAsync(sender as Button, async () =>
+        {
+            if (_project == null) return;
+            var bytes = await _pdf.ExportCoverAsync(_project);
+            var fileName = $"Calendar_{_project.Year}_Cover.pdf";
+            await SaveBytesAsync(fileName, bytes);
+        });
     }
 
     private async void OnExportYearClicked(object? sender, EventArgs e)
     {
-        if (_project == null) return;
-        var bytes = await _pdf.ExportYearAsync(_project, includeCover: true);
-        var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
-        await SaveBytesAsync(fileName, bytes);
+        await WithBusyButtonAsync(sender as Button, async () =>
+        {
+            if (_project == null) return;
+            var bytes = await _pdf.ExportYearAsync(_project, includeCover: true);
+            var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
+            await SaveBytesAsync(fileName, bytes);
+        }, busyText: "Exporting year…");
     }
 
     private async Task SaveBytesAsync(string suggestedFileName, byte[] bytes)
