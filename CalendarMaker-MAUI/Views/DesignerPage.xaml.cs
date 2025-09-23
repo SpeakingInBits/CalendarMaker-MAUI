@@ -557,4 +557,30 @@ public partial class DesignerPage : ContentPage
             }
         }
     }
+
+    private void OnSplitResetTapped(object? sender, TappedEventArgs e)
+    {
+        if (_project != null)
+        {
+            _project.LayoutSpec.SplitRatio = 0.5;
+            SplitSlider.Value = 0.5;
+            SplitValueLabel.Text = "50%";
+            _ = _storage.UpdateProjectAsync(_project);
+            _canvas.InvalidateSurface();
+        }
+    }
+
+    private void OnZoomResetTapped(object? sender, TappedEventArgs e)
+    {
+        var asset = GetActiveAsset();
+        if (asset != null)
+        {
+            asset.Zoom = 1;
+            asset.PanX = asset.PanY = 0;
+            ZoomSlider.Value = 1;
+            ZoomValueLabel.Text = "1.00x";
+            _ = _storage.UpdateProjectAsync(_project!);
+            _canvas.InvalidateSurface();
+        }
+    }
 }
