@@ -4,8 +4,8 @@
              xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
              x:Class="CalendarMaker_MAUI.Views.DesignerPage"
              Title="Designer">
-    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="260,*" ColumnSpacing="12">
-        <ScrollView Grid.Column="0">
+    <Grid RowDefinitions="*" Padding="12" ColumnDefinitions="260,*" ColumnSpacing="12">
+        <ScrollView Grid.Column="0" VerticalScrollBarVisibility="Always" Padding="0,0,10,0">
             <VerticalStackLayout Spacing="10">
                 <Label Text="Designer" FontAttributes="Bold" />
                 <HorizontalStackLayout Spacing="6">
