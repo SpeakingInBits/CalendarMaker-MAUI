@@ -4,8 +4,8 @@
              x:Class="CalendarMaker_MAUI.Views.ProjectsPage"
              Title="Projects">
     <VerticalStackLayout Padding="16" Spacing="12">
-        <Button Text="Create Default Project" x:Name="CreateBtn" />
-        <CollectionView x:Name="ProjectsList" SelectionMode="Single">
+        <Button Text="New Project" x:Name="CreateBtn" />
+        <CollectionView x:Name="ProjectsList" SelectionMode="None">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <Frame Padding="8" Margin="0,6" HasShadow="False" BorderColor="LightGray">

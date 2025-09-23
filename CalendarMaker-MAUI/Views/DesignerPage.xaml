@@ -11,8 +11,16 @@
                 <Label x:Name="MonthLabel" VerticalTextAlignment="Center" />
                 <Button Text="Next" x:Name="NextBtn" />
             </HorizontalStackLayout>
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="Cover Page" VerticalTextAlignment="Center" />
+                <Switch x:Name="CoverSwitch" />
+            </HorizontalStackLayout>
             <Button Text="Add Photo" x:Name="AddPhotoBtn" />
+            <Button Text="Add Cover Photo" x:Name="AddCoverPhotoBtn" />
+            <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
+            <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
             <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
+            <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" Clicked="OnExportCoverClicked" />
             <Button Text="Back" x:Name="BackBtn" />
         </VerticalStackLayout>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">

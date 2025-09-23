@@ -9,11 +9,22 @@ using SkiaSharp;
 public interface IPdfExportService
 {
     Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex);
+    Task<byte[]> ExportCoverAsync(CalendarProject project);
 }
 
 public sealed class PdfExportService : IPdfExportService
 {
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
+    {
+        return RenderToPdfAsync(project, monthIndex, renderCover: false);
+    }
+
+    public Task<byte[]> ExportCoverAsync(CalendarProject project)
+    {
+        return RenderToPdfAsync(project, 0, renderCover: true);
+    }
+
+    private Task<byte[]> RenderToPdfAsync(CalendarProject project, int monthIndex, bool renderCover)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -22,18 +33,25 @@ public sealed class PdfExportService : IPdfExportService
         float pageHpt = (float)pageDims.heightPt;
         if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
 
-        // Render a full-page bitmap with Skia to embed as an image
         using var skSurface = SKSurface.Create(new SKImageInfo((int)pageWpt, (int)pageHpt, SKColorType.Bgra8888, SKAlphaType.Premul));
         var sk = skSurface.Canvas;
         sk.Clear(SKColors.White);
 
         var m = project.Margins;
         var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
-        (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
-        DrawPhoto(sk, photoRect, project, monthIndex);
-        DrawCalendarGrid(sk, calRect, project, monthIndex);
-        sk.Flush();
 
+        if (renderCover)
+        {
+            DrawCover(sk, contentRect, project);
+        }
+        else
+        {
+            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            DrawPhoto(sk, photoRect, project, monthIndex);
+            DrawCalendarGrid(sk, calRect, project, monthIndex);
+        }
+
+        sk.Flush();
         using var snapshot = skSurface.Snapshot();
         using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
         var imageBytes = data.ToArray();
@@ -128,6 +146,63 @@ public sealed class PdfExportService : IPdfExportService
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.DrawBitmap(bmp, dest, paint);
+    }
+
+    private static void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project)
+    {
+        var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
+        if (asset != null && File.Exists(asset.Path))
+        {
+            using var bmp = SKBitmap.Decode(asset.Path);
+            if (bmp != null)
+            {
+                var imgAspect = (float)bmp.Width / (float)bmp.Height;
+                var rectAspect = bounds.Width / bounds.Height;
+                SKRect dest;
+                if (project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+                {
+                    if (imgAspect > rectAspect)
+                    {
+                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
+                        dest = new SKRect(bounds.Left - excess, bounds.Top, bounds.Left - excess + targetW, bounds.Top + targetH);
+                    }
+                    else
+                    {
+                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
+                        dest = new SKRect(bounds.Left, bounds.Top - excess, bounds.Left + targetW, bounds.Top - excess + targetH);
+                    }
+                }
+                else
+                {
+                    if (imgAspect > rectAspect)
+                    {
+                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var pad = (bounds.Height - targetH) / 2f;
+                        dest = new SKRect(bounds.Left, bounds.Top + pad, bounds.Left + targetW, bounds.Top + pad + targetH);
+                    }
+                    else
+                    {
+                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var pad = (bounds.Width - targetW) / 2f;
+                        dest = new SKRect(bounds.Left + pad, bounds.Top, bounds.Left + pad + targetW, bounds.Top + targetH);
+                    }
+                }
+                using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
+                canvas.DrawBitmap(bmp, dest, paint);
+            }
+        }
+        else
+        {
+            canvas.DrawRect(bounds, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
+        }
+
+        // Title / Subtitle
+        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
+        using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
+        var title = project.CoverSpec.TitleText ?? string.Empty;
+        var subtitle = project.CoverSpec.SubtitleText ?? string.Empty;
+        var tw = titlePaint.MeasureText(title);
+        canvas.DrawText(title, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
+        var sw = subtitlePaint.MeasureText(subtitle);
+        canvas.DrawText(subtitle, bounds.MidX - sw / 2, bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize, subtitlePaint);
     }
 
     private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex)

@@ -38,6 +38,13 @@ public partial class ProjectsViewModel : ObservableObject
         await LoadAsync();
     }
 
+    public async Task CreateSpecificProjectAsync(CalendarProject project)
+    {
+        _layoutService.ApplyDefaultPreset(project);
+        await _storage.CreateProjectAsync(project);
+        await LoadAsync();
+    }
+
     [RelayCommand]
     public async Task DeleteProjectAsync(CalendarProject project)
     {

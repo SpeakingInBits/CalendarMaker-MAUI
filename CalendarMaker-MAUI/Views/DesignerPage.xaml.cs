@@ -35,13 +35,48 @@ public partial class DesignerPage : ContentPage
         PrevBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 11) % 12; UpdateMonthLabel(); _canvas.InvalidateSurface(); };
         NextBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 1) % 12; UpdateMonthLabel(); _canvas.InvalidateSurface(); };
         AddPhotoBtn.Clicked += async (_, __) => await PickAndAssignPhotoAsync();
+        AddCoverPhotoBtn.Clicked += async (_, __) => await PickAndAssignCoverPhotoAsync();
+
+        CoverSwitch.Toggled += (_, __) => _canvas.InvalidateSurface();
+        TitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.TitleText = TitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        SubtitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.SubtitleText = SubtitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
 
         _monthIndex = 0; // start with first month
+    }
+
+    private async Task PickAndAssignCoverPhotoAsync()
+    {
+        if (_project == null) return;
+        var result = await FilePicker.PickAsync(new PickOptions
+        {
+            PickerTitle = "Select a cover photo",
+            FileTypes = FilePickerFileType.Images
+        });
+        if (result == null) return;
+        var asset = await _assets.ImportMonthPhotoAsync(_project, -1, result);
+        if (asset != null)
+        {
+            asset.Role = "coverPhoto";
+            asset.MonthIndex = null;
+            await _storage.UpdateProjectAsync(_project);
+            _canvas.InvalidateSurface();
+        }
     }
 
     private async void OnExportClicked(object? sender, EventArgs e)
     {
         await ExportCurrentMonthAsync();
+    }
+
+    private async void OnExportCoverClicked(object? sender, EventArgs e)
+    {
+        if (_project == null) return;
+        var bytes = await _pdf.ExportCoverAsync(_project);
+        var dir = FileSystem.Current.AppDataDirectory;
+        var fileName = $"Calendar_{_project.Year}_Cover.pdf";
+        var path = Path.Combine(dir, fileName);
+        await File.WriteAllBytesAsync(path, bytes);
+        await Share.RequestAsync(new ShareFileRequest { Title = "Exported PDF", File = new ShareFile(path) });
     }
 
     private async Task ExportCurrentMonthAsync()
@@ -67,6 +102,11 @@ public partial class DesignerPage : ContentPage
         {
             var projects = await _storage.GetProjectsAsync();
             _project = projects.FirstOrDefault(p => p.Id == ProjectId);
+            if (_project != null)
+            {
+                TitleEntry.Text = _project.CoverSpec.TitleText;
+                SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
+            }
             UpdateMonthLabel();
             _canvas.InvalidateSurface();
         }
@@ -103,44 +143,98 @@ public partial class DesignerPage : ContentPage
         if (_project is null)
             return;
 
-        // Calculate page in points and scale to canvas
         var (pageWpt, pageHpt) = PageSizes.GetPoints(_project.PageSpec);
         if (pageWpt <= 0 || pageHpt <= 0)
         {
-            pageWpt = 612; // Letter default
-            pageHpt = 792;
+            pageWpt = 612; pageHpt = 792;
         }
         var scale = Math.Min(e.Info.Width / (float)pageWpt, e.Info.Height / (float)pageHpt);
         var offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
         var offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
 
-        // Transform so that drawing in page points maps to pixels
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale((float)scale);
 
         var pageRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
-
         using var pageBorder = new SKPaint { Color = SKColors.LightGray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
         canvas.DrawRect(pageRect, pageBorder);
 
-        // Margins in points
         var m = _project.Margins;
         var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
 
         using var contentBorder = new SKPaint { Color = SKColors.Silver, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
         canvas.DrawRect(contentRect, contentBorder);
 
-        // Split regions
-        (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
-
-        // Photo rendering
-        DrawPhoto(canvas, photoRect);
-
-        // Calendar grid
-        DrawCalendarGrid(canvas, calRect, _project);
+        if (CoverSwitch.IsToggled)
+        {
+            DrawCover(canvas, contentRect, _project);
+        }
+        else
+        {
+            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
+            DrawPhoto(canvas, photoRect);
+            DrawCalendarGrid(canvas, calRect, _project);
+        }
 
         canvas.Restore();
+    }
+
+    private void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project)
+    {
+        var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
+        if (asset != null && File.Exists(asset.Path))
+        {
+            using var bmp = SKBitmap.Decode(asset.Path);
+            if (bmp != null)
+            {
+                var imgAspect = (float)bmp.Width / (float)bmp.Height;
+                var rectAspect = bounds.Width / bounds.Height;
+                SKRect dest;
+                if (project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+                {
+                    if (imgAspect > rectAspect)
+                    {
+                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
+                        dest = new SKRect(bounds.Left - excess, bounds.Top, bounds.Left - excess + targetW, bounds.Top + targetH);
+                    }
+                    else
+                    {
+                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
+                        dest = new SKRect(bounds.Left, bounds.Top - excess, bounds.Left + targetW, bounds.Top - excess + targetH);
+                    }
+                }
+                else
+                {
+                    if (imgAspect > rectAspect)
+                    {
+                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var pad = (bounds.Height - targetH) / 2f;
+                        dest = new SKRect(bounds.Left, bounds.Top + pad, bounds.Left + targetW, bounds.Top + pad + targetH);
+                    }
+                    else
+                    {
+                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var pad = (bounds.Width - targetW) / 2f;
+                        dest = new SKRect(bounds.Left + pad, bounds.Top, bounds.Left + pad + targetW, bounds.Top + targetH);
+                    }
+                }
+                using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
+                canvas.DrawBitmap(bmp, dest, paint);
+            }
+        }
+        else
+        {
+            canvas.DrawRect(bounds, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
+        }
+
+        // Title / Subtitle
+        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
+        using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
+        var title = project.CoverSpec.TitleText ?? string.Empty;
+        var subtitle = project.CoverSpec.SubtitleText ?? string.Empty;
+        var tw = titlePaint.MeasureText(title);
+        canvas.DrawText(title, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
+        var sw = subtitlePaint.MeasureText(subtitle);
+        canvas.DrawText(subtitle, bounds.MidX - sw / 2, bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize, subtitlePaint);
     }
 
     private void DrawPhoto(SKCanvas canvas, SKRect rect)
@@ -287,7 +381,7 @@ public partial class DesignerPage : ContentPage
         }
 
         // Weeks grid cells
-        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
+        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         float rowH = weeksArea.Height / rows;
         for (int r = 0; r < rows; r++)
