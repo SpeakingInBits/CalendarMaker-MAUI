@@ -27,7 +27,6 @@ namespace CalendarMaker_MAUI
             builder.Services.AddSingleton<ILayoutService, LayoutService>();
             builder.Services.AddSingleton<IProjectStorageService, ProjectStorageService>();
             builder.Services.AddSingleton<IAssetService, AssetService>();
-            builder.Services.AddSingleton<IRenderService, RenderService>();
             builder.Services.AddSingleton<IPdfExportService, PdfExportService>();
 
             builder.Services.AddTransient<ProjectsViewModel>();

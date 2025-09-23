@@ -7,6 +7,9 @@ public interface IProjectStorageService
     Task<string> CreateProjectAsync(CalendarProject project);
     Task<IReadOnlyList<CalendarProject>> GetProjectsAsync();
     Task DeleteProjectAsync(string projectId);
+    Task UpdateProjectAsync(CalendarProject project);
+
+    string GetProjectDirectory(string projectId);
 }
 
 public sealed class ProjectStorageService : IProjectStorageService
@@ -24,13 +27,7 @@ public sealed class ProjectStorageService : IProjectStorageService
         project.Id = Guid.NewGuid().ToString("N");
         var dir = Path.Combine(_root, project.Id);
         Directory.CreateDirectory(dir);
-
-        var jsonPath = Path.Combine(dir, "project.json");
-        var json = System.Text.Json.JsonSerializer.Serialize(project, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-        await File.WriteAllTextAsync(jsonPath, json);
+        await WriteProjectJsonAsync(dir, project);
         return project.Id;
     }
 
@@ -60,5 +57,28 @@ public sealed class ProjectStorageService : IProjectStorageService
             catch { /* swallow for now; could log */ }
         }
         return Task.CompletedTask;
+    }
+
+    public async Task UpdateProjectAsync(CalendarProject project)
+    {
+        var dir = GetProjectDirectory(project.Id);
+        Directory.CreateDirectory(dir);
+        project.UpdatedUtc = DateTime.UtcNow;
+        await WriteProjectJsonAsync(dir, project);
+    }
+
+    public string GetProjectDirectory(string projectId)
+    {
+        return Path.Combine(_root, projectId);
+    }
+
+    private static async Task WriteProjectJsonAsync(string dir, CalendarProject project)
+    {
+        var jsonPath = Path.Combine(dir, "project.json");
+        var json = System.Text.Json.JsonSerializer.Serialize(project, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+        await File.WriteAllTextAsync(jsonPath, json);
     }
 }

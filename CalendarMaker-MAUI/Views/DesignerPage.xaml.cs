@@ -1,6 +1,7 @@
 using System.Globalization;
 using CalendarMaker_MAUI.Models;
 using CalendarMaker_MAUI.Services;
+using Microsoft.Maui.Storage;
 using SkiaSharp;
 using SkiaSharp.Views.Maui.Controls;
 
@@ -12,23 +13,51 @@ public partial class DesignerPage : ContentPage
     private CalendarProject? _project;
     private readonly ICalendarEngine _engine;
     private readonly IProjectStorageService _storage;
+    private readonly IAssetService _assets;
+    private readonly IPdfExportService _pdf;
     private readonly SKCanvasView _canvas;
     private int _monthIndex; // 0..11 relative to StartMonth
 
     public string? ProjectId { get; set; }
 
-    public DesignerPage(ICalendarEngine engine, IProjectStorageService storage)
+    public DesignerPage(ICalendarEngine engine, IProjectStorageService storage, IAssetService assets, IPdfExportService pdf)
     {
         InitializeComponent();
         _engine = engine;
         _storage = storage;
+        _assets = assets;
+        _pdf = pdf;
         _canvas = new SKCanvasView();
         _canvas.PaintSurface += Canvas_PaintSurface;
         CanvasHost.Content = _canvas;
 
         BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
+        PrevBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 11) % 12; UpdateMonthLabel(); _canvas.InvalidateSurface(); };
+        NextBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 1) % 12; UpdateMonthLabel(); _canvas.InvalidateSurface(); };
+        AddPhotoBtn.Clicked += async (_, __) => await PickAndAssignPhotoAsync();
 
         _monthIndex = 0; // start with first month
+    }
+
+    private async void OnExportClicked(object? sender, EventArgs e)
+    {
+        await ExportCurrentMonthAsync();
+    }
+
+    private async Task ExportCurrentMonthAsync()
+    {
+        if (_project == null) return;
+        var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
+        var dir = FileSystem.Current.AppDataDirectory;
+        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
+        var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
+        var path = Path.Combine(dir, fileName);
+        await File.WriteAllBytesAsync(path, bytes);
+        await Share.RequestAsync(new ShareFileRequest
+        {
+            Title = "Exported PDF",
+            File = new ShareFile(path)
+        });
     }
 
     protected override async void OnNavigatedTo(NavigatedToEventArgs args)
@@ -38,6 +67,31 @@ public partial class DesignerPage : ContentPage
         {
             var projects = await _storage.GetProjectsAsync();
             _project = projects.FirstOrDefault(p => p.Id == ProjectId);
+            UpdateMonthLabel();
+            _canvas.InvalidateSurface();
+        }
+    }
+
+    private void UpdateMonthLabel()
+    {
+        if (_project == null) { MonthLabel.Text = string.Empty; return; }
+        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
+        var year = _project.Year + (_project.StartMonth - 1 + _monthIndex) / 12;
+        MonthLabel.Text = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+    }
+
+    private async Task PickAndAssignPhotoAsync()
+    {
+        if (_project == null) return;
+        var result = await FilePicker.PickAsync(new PickOptions
+        {
+            PickerTitle = "Select a photo",
+            FileTypes = FilePickerFileType.Images
+        });
+        if (result == null) return;
+        var asset = await _assets.ImportMonthPhotoAsync(_project, _monthIndex, result);
+        if (asset != null)
+        {
             _canvas.InvalidateSurface();
         }
     }
@@ -80,16 +134,89 @@ public partial class DesignerPage : ContentPage
         // Split regions
         (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
 
-        // Draw photo placeholder
-        using var photoFill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
-        canvas.DrawRect(photoRect, photoFill);
-        using var photoBorder = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
-        canvas.DrawRect(photoRect, photoBorder);
+        // Photo rendering
+        DrawPhoto(canvas, photoRect);
 
-        // Draw calendar grid
+        // Calendar grid
         DrawCalendarGrid(canvas, calRect, _project);
 
         canvas.Restore();
+    }
+
+    private void DrawPhoto(SKCanvas canvas, SKRect rect)
+    {
+        if (_project == null) return;
+        var asset = _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex);
+        if (asset == null || string.IsNullOrEmpty(asset.Path) || !File.Exists(asset.Path))
+        {
+            using var photoFill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
+            canvas.DrawRect(rect, photoFill);
+            using var photoBorder = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+            canvas.DrawRect(rect, photoBorder);
+            return;
+        }
+
+        using var bmp = SKBitmap.Decode(asset.Path);
+        if (bmp == null)
+        {
+            canvas.DrawRect(rect, new SKPaint { Color = SKColors.LightGray });
+            return;
+        }
+
+        // Cover / Contain based on project.LayoutSpec.PhotoFill
+        SKRect dest = rect;
+        var imgW = (float)bmp.Width;
+        var imgH = (float)bmp.Height;
+        var rectW = rect.Width;
+        var rectH = rect.Height;
+        var imgAspect = imgW / imgH;
+        var rectAspect = rectW / rectH;
+
+        if (_project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+        {
+            // Scale to fill the rect (crop)
+            if (imgAspect > rectAspect)
+            {
+                // Image is wider, crop width
+                var targetH = rectH;
+                var scale = targetH / imgH;
+                var targetW = imgW * scale;
+                var excess = (targetW - rectW) / 2f;
+                dest = new SKRect(rect.Left - excess, rect.Top, rect.Left - excess + targetW, rect.Top + targetH);
+            }
+            else
+            {
+                // Image is taller, crop height
+                var targetW = rectW;
+                var scale = targetW / imgW;
+                var targetH = imgH * scale;
+                var excess = (targetH - rectH) / 2f;
+                dest = new SKRect(rect.Left, rect.Top - excess, rect.Left + targetW, rect.Top - excess + targetH);
+            }
+        }
+        else
+        {
+            // Contain: fully fit into rect (letterbox)
+            if (imgAspect > rectAspect)
+            {
+                var targetW = rectW;
+                var scale = targetW / imgW;
+                var targetH = imgH * scale;
+                var pad = (rectH - targetH) / 2f;
+                dest = new SKRect(rect.Left, rect.Top + pad, rect.Left + targetW, rect.Top + pad + targetH);
+            }
+            else
+            {
+                var targetH = rectH;
+                var scale = targetH / imgH;
+                var targetW = imgW * scale;
+                var pad = (rectW - targetW) / 2f;
+                dest = new SKRect(rect.Left + pad, rect.Top, rect.Left + pad + targetW, rect.Top + targetH);
+            }
+        }
+
+        using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
+        canvas.DrawBitmap(bmp, dest, paint);
     }
 
     private (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)

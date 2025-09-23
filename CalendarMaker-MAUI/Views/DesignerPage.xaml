@@ -3,9 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CalendarMaker_MAUI.Views.DesignerPage"
              Title="Designer">
-    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="200,*" ColumnSpacing="12">
+    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="220,*" ColumnSpacing="12">
         <VerticalStackLayout Grid.Column="0" Spacing="10">
             <Label Text="Designer" FontAttributes="Bold" />
+            <HorizontalStackLayout Spacing="6">
+                <Button Text="Prev" x:Name="PrevBtn" />
+                <Label x:Name="MonthLabel" VerticalTextAlignment="Center" />
+                <Button Text="Next" x:Name="NextBtn" />
+            </HorizontalStackLayout>
+            <Button Text="Add Photo" x:Name="AddPhotoBtn" />
+            <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
             <Button Text="Back" x:Name="BackBtn" />
         </VerticalStackLayout>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">

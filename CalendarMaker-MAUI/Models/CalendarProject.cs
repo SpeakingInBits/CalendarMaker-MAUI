@@ -16,6 +16,8 @@ public sealed class CalendarProject
     public LayoutSpec LayoutSpec { get; set; } = new();
     public CoverSpec CoverSpec { get; set; } = new();
 
+    public List<ImageAsset> ImageAssets { get; set; } = new();
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 }
