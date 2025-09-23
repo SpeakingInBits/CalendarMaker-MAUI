@@ -189,7 +189,7 @@ public partial class DesignerPage : ContentPage
         var result = await FileSaver.Default.SaveAsync(suggestedFileName, stream, default);
         if (!result.IsSuccessful)
         {
-            await DisplayAlert("Save Failed", result.Exception?.Message ?? "Unknown error", "OK");
+            await this.DisplayAlertAsync("Save Failed", result.Exception?.Message ?? "Unknown error", "OK");
         }
     }
 
