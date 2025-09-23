@@ -21,6 +21,13 @@ public enum TextAlignment
     Right
 }
 
+public enum PhotoLayout
+{
+    Single,
+    TwoVerticalSplit, // two photos side-by-side (vertical divider)
+    Grid2x2           // four photos (2x2 grid)
+}
+
 public sealed class LayoutSpec
 {
     public LayoutPlacement Placement { get; set; } = LayoutPlacement.PhotoTopCalendarBottom;
@@ -28,4 +35,7 @@ public sealed class LayoutSpec
     public double SplitRatio { get; set; } = 0.5;
     public PhotoFillMode PhotoFill { get; set; } = PhotoFillMode.Cover;
     public TextAlignment Alignment { get; set; } = TextAlignment.Center;
+
+    // How many photo slots and their arrangement inside the photo area
+    public PhotoLayout PhotoLayout { get; set; } = PhotoLayout.Single;
 }

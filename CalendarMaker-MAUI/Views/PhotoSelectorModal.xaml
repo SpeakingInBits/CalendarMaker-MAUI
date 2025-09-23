@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="CalendarMaker_MAUI.Views.PhotoSelectorModal"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Select Photo"
+             BackgroundColor="Black">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="60" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="60" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" BackgroundColor="#1F1F1F">
+            <Grid Padding="20,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="CancelBtn" 
+                        Grid.Column="0"
+                        Text="Cancel" 
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="16" />
+
+                <Label x:Name="HeaderLabel"
+                       Grid.Column="1" 
+                       Text="Select Photo for Slot"
+                       TextColor="White"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+
+                <Button x:Name="RemoveBtn" 
+                        Grid.Column="2"
+                        Text="Remove"
+                        BackgroundColor="#FF4444"
+                        TextColor="White"
+                        FontSize="16"
+                        CornerRadius="8" />
+            </Grid>
+        </Border>
+
+        <!-- Photo Grid -->
+        <ScrollView Grid.Row="1" BackgroundColor="Black">
+            <CollectionView x:Name="PhotosCollectionView"
+                          BackgroundColor="Black"
+                          SelectionMode="Single"
+                          SelectionChanged="OnPhotoSelected">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical" 
+                                   Span="3" 
+                                   VerticalItemSpacing="8" 
+                                   HorizontalItemSpacing="8" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border BackgroundColor="#333333" 
+                                StrokeThickness="2"
+                                Stroke="Transparent">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="8" />
+                            </Border.StrokeShape>
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Stroke" Value="#007ACC" />
+                                    <Setter Property="StrokeThickness" Value="3" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Grid>
+                                <Image Source="{Binding Path}" 
+                                       Aspect="AspectFill"
+                                       HeightRequest="120"
+                                       WidthRequest="120" />
+                                <!-- Overlay for selection -->
+                                <Border BackgroundColor="#33007ACC">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="8" />
+                                    </Border.StrokeShape>
+                                    <Border.IsVisible>
+                                        <Binding Path="IsSelected" />
+                                    </Border.IsVisible>
+                                    <Label Text="?" 
+                                           TextColor="White"
+                                           FontSize="24"
+                                           FontAttributes="Bold"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center" />
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </ScrollView>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" BackgroundColor="#1F1F1F">
+            <Grid Padding="20,10">
+                <Label x:Name="StatusLabel" 
+                       Text="Tap a photo to select, then tap Assign"
+                       TextColor="#CCCCCC"
+                       FontSize="14"
+                       HorizontalOptions="Start"
+                       VerticalOptions="Center" />
+                
+                <Button x:Name="AssignBtn" 
+                        Text="Assign Selected"
+                        BackgroundColor="#007ACC"
+                        TextColor="White"
+                        FontSize="16"
+                        CornerRadius="8"
+                        HorizontalOptions="End"
+                        VerticalOptions="Center"
+                        IsEnabled="False" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

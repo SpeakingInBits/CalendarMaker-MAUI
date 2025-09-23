@@ -33,33 +33,36 @@ public sealed class PdfExportService : IPdfExportService
 
     private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
-
-        var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
-        float pageWpt = (float)wPtD;
-        float pageHpt = (float)hPtD;
-        if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
-
-        // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
-        var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
-
-        var doc = Document.Create(container =>
+        return Task.Run(() =>
         {
-            foreach (var img in rendered)
-            {
-                container.Page(page =>
-                {
-                    page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
-                    page.Margin(0);
-                    page.DefaultTextStyle(x => x.FontSize(12));
-                    page.Content().Image(img).FitArea();
-                });
-            }
-        });
+            QuestPDF.Settings.License = LicenseType.Community;
 
-        using var stream = new MemoryStream();
-        doc.GeneratePdf(stream);
-        return Task.FromResult(stream.ToArray());
+            var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
+            float pageWpt = (float)wPtD;
+            float pageHpt = (float)hPtD;
+            if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
+
+            // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
+            var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
+
+            var doc = Document.Create(container =>
+            {
+                foreach (var img in rendered)
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
+                        page.Margin(0);
+                        page.DefaultTextStyle(x => x.FontSize(12));
+                        page.Content().Image(img).FitArea();
+                    });
+                }
+            });
+
+            using var stream = new MemoryStream();
+            doc.GeneratePdf(stream);
+            return stream.ToArray();
+        });
     }
 
     private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi)
@@ -95,15 +98,26 @@ public sealed class PdfExportService : IPdfExportService
         else
         {
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
-            sk.Save(); sk.ClipRect(photoRect, antialias: true);
-            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex);
-            if (asset != null && File.Exists(asset.Path))
+            var layout = project.MonthPhotoLayouts.TryGetValue(monthIndex, out var perMonth)
+                ? perMonth
+                : project.LayoutSpec.PhotoLayout;
+            sk.Save();
+            var slots = ComputePhotoSlots(photoRect, layout);
+            foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
-                using var bmp = SKBitmap.Decode(asset.Path);
-                if (bmp != null)
-                    DrawBitmapWithPanZoom(sk, bmp, photoRect, asset);
+                sk.Save(); sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets
+                    .Where(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex && (a.SlotIndex ?? 0) == slotIndex)
+                    .OrderBy(a => a.Order)
+                    .FirstOrDefault();
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    using var bmp = SKBitmap.Decode(asset.Path);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
             }
-            sk.Restore();
             DrawCalendarGrid(sk, calRect, project, monthIndex);
         }
 
@@ -132,6 +146,36 @@ public sealed class PdfExportService : IPdfExportService
                  new SKRect(area.Left, area.Top, area.Right, area.Top + area.Height * (1 - ratio))),
             _ => (area, area)
         };
+    }
+
+    private static List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout)
+    {
+        const float gap = 4f;
+        var list = new List<SKRect>();
+        switch (layout)
+        {
+            case PhotoLayout.TwoVerticalSplit:
+                {
+                    float halfW = (area.Width - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.Grid2x2:
+                {
+                    float halfW = (area.Width - gap) / 2f;
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
+                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
+                    break;
+                }
+            default:
+                list.Add(area);
+                break;
+        }
+        return list;
     }
 
     private static void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
