@@ -88,10 +88,26 @@ public partial class DesignerPage : ContentPage
         catch { }
     }
 
+    private async Task RemoveExistingAssetsForSlotAsync(int monthIndex, int slotIndex)
+    {
+        if (_project == null) return;
+        var toRemove = _project.ImageAssets
+            .Where(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex && (a.SlotIndex ?? 0) == slotIndex)
+            .ToList();
+        foreach (var ex in toRemove)
+        {
+            _project.ImageAssets.Remove(ex);
+            try { if (!string.IsNullOrEmpty(ex.Path) && File.Exists(ex.Path)) File.Delete(ex.Path); } catch { }
+        }
+        await _storage.UpdateProjectAsync(_project);
+    }
+
     private async Task ImportPhotoFromPathAsync(string path)
     {
         if (_project == null) return;
-        // Emulate the same as picker by creating a FileResult
+        // Ensure we replace any existing asset for this slot
+        await RemoveExistingAssetsForSlotAsync(_monthIndex, _activeSlotIndex);
+
         var fileResult = new FileResult(path);
         var asset = await _assets.ImportMonthPhotoAsync(_project, _monthIndex, fileResult);
         if (asset != null)
@@ -116,11 +132,75 @@ public partial class DesignerPage : ContentPage
             {
                 fe.IsTabStop = true;
                 fe.KeyDown += OnCanvasKeyDown;
+                // Enable Windows drag & drop directly on the platform view
+                fe.AllowDrop = true;
+                fe.DragOver += OnWinDragOver;
+                fe.Drop += OnWinDropAsync;
+                fe.PointerPressed += OnWinPointerPressed;
             }
         }
         catch { }
 #endif
     }
+
+#if WINDOWS
+    private void OnWinDragOver(object? sender, Microsoft.UI.Xaml.DragEventArgs e)
+    {
+        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+        e.Handled = true;
+    }
+
+    private async void OnWinDropAsync(object? sender, Microsoft.UI.Xaml.DragEventArgs e)
+    {
+        try
+        {
+            if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                var file = items.OfType<Windows.Storage.StorageFile>().FirstOrDefault();
+                if (file != null)
+                {
+                    var fe = sender as Microsoft.Maui.Platform.ContentPanel;
+                    var posDip = e.GetPosition((Microsoft.UI.Xaml.UIElement)sender);
+                    double scale = fe?.XamlRoot?.RasterizationScale ?? 1.0;
+                    // Convert DIPs to device pixels to match Skia e.Info units
+                    var px = posDip.X * scale;
+                    var py = posDip.Y * scale;
+                    var pagePt = new SKPoint((float)((px - _pageOffsetX) / _pageScale), (float)((py - _pageOffsetY) / _pageScale));
+
+                    if (!CoverSwitch.IsToggled && _lastPhotoSlots.Count > 0)
+                    {
+                        var idx = _lastPhotoSlots.FindIndex(r => r.Contains(pagePt));
+                        _activeSlotIndex = idx >= 0 ? idx : 0;
+                    }
+                    await ImportPhotoFromPathAsync(file.Path);
+                    e.Handled = true;
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void OnWinPointerPressed(object? sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        try
+        {
+            var fe = sender as Microsoft.Maui.Platform.ContentPanel;
+            var posDip = e.GetCurrentPoint((Microsoft.UI.Xaml.UIElement)sender).Position;
+            double scale = fe?.XamlRoot?.RasterizationScale ?? 1.0;
+            var px = posDip.X * scale;
+            var py = posDip.Y * scale;
+            var pagePt = new SKPoint((float)((px - _pageOffsetX) / _pageScale), (float)((py - _pageOffsetY) / _pageScale));
+            if (!CoverSwitch.IsToggled && _lastPhotoSlots.Count > 0)
+            {
+                var idx = _lastPhotoSlots.FindIndex(r => r.Contains(pagePt));
+                _activeSlotIndex = idx >= 0 ? idx : 0;
+                _canvas.InvalidateSurface();
+            }
+        }
+        catch { }
+    }
+#endif
 
     private void PopulateStaticPickers()
     {
@@ -338,6 +418,10 @@ public partial class DesignerPage : ContentPage
         if (_project == null) return;
         var result = await FilePicker.PickAsync(new PickOptions { PickerTitle = "Select a photo", FileTypes = FilePickerFileType.Images });
         if (result == null) return;
+
+        // Ensure we replace any existing asset for this slot
+        await RemoveExistingAssetsForSlotAsync(_monthIndex, _activeSlotIndex);
+
         var asset = await _assets.ImportMonthPhotoAsync(_project, _monthIndex, result);
         if (asset != null)
         {
@@ -447,16 +531,26 @@ public partial class DesignerPage : ContentPage
                 using var photoBorder = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
                 canvas.DrawRect(rect, photoFill);
                 canvas.DrawRect(rect, photoBorder);
-                continue;
+            }
+            else
+            {
+                using var bmp = SKBitmap.Decode(asset.Path);
+                if (bmp == null)
+                {
+                    canvas.DrawRect(rect, new SKPaint { Color = SKColors.LightGray });
+                }
+                else
+                {
+                    DrawBitmapWithPanZoom(canvas, bmp, rect, asset);
+                }
             }
 
-            using var bmp = SKBitmap.Decode(asset.Path);
-            if (bmp == null)
+            // Active slot highlight
+            if (i == _activeSlotIndex && !CoverSwitch.IsToggled)
             {
-                canvas.DrawRect(rect, new SKPaint { Color = SKColors.LightGray });
-                continue;
+                using var hi = new SKPaint { Color = SKColors.DeepSkyBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 2f };
+                canvas.DrawRect(rect, hi);
             }
-            DrawBitmapWithPanZoom(canvas, bmp, rect, asset);
         }
     }
 
@@ -473,21 +567,17 @@ public partial class DesignerPage : ContentPage
         }
         else
         {
-            canvas.DrawRect(bounds, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
+            using var fill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
+            canvas.DrawRect(bounds, fill);
         }
 
-        // subtle hint overlay when centered and zoom = 1
-        DrawDragHint(canvas, bounds, asset);
-
-        // Title / Subtitle
-        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
-        using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
-        var title = project.CoverSpec.TitleText ?? string.Empty;
-        var subtitle = project.CoverSpec.SubtitleText ?? string.Empty;
-        var tw = titlePaint.MeasureText(title);
-        canvas.DrawText(title, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
-        var sw = subtitlePaint.MeasureText(subtitle);
-        canvas.DrawText(subtitle, bounds.MidX - sw / 2, bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize, subtitlePaint);
+        // subtitle hint
+        if (string.IsNullOrWhiteSpace(project.CoverSpec.SubtitleText))
+            return;
+        using var hint = new SKPaint { Color = new SKColor(0, 0, 0, 60), TextSize = 10, IsAntialias = true };
+        var text = "Drag to reposition • Double-tap to center • Use zoom";
+        var tw = hint.MeasureText(text);
+        canvas.DrawText(text, bounds.MidX - tw / 2, bounds.Top + 40, hint);
     }
 
     private void DrawPhoto(SKCanvas canvas, SKRect rect)
@@ -528,24 +618,24 @@ public partial class DesignerPage : ContentPage
         canvas.Restore();
     }
 
-    private void DrawDragHint(SKCanvas canvas, SKRect rect, ImageAsset? asset)
-    {
-        if (asset == null) return;
-        if (_isDragging) return;
-        if (Math.Abs(asset.PanX) > 0.001 || Math.Abs(asset.PanY) > 0.001 || Math.Abs(asset.Zoom - 1) > 0.001)
-            return;
-        using var hint = new SKPaint { Color = new SKColor(0, 0, 0, 60), TextSize = 10, IsAntialias = true };
-        var text = "Drag to reposition • Double-click to center • Use zoom";
-        var tw = hint.MeasureText(text);
-        canvas.DrawText(text, rect.MidX - tw / 2, rect.MidY, hint);
-    }
-
     private void OnCanvasTouch(object? sender, SKTouchEventArgs e)
     {
         if (_project == null)
             return;
 
-        var pagePt = new SKPoint((float)((e.Location.X - _pageOffsetX) / _pageScale), (float)((e.Location.Y - _pageOffsetY) / _pageScale));
+        // Convert touch location from DIPs to pixels using canvas size vs view width ratio
+        var loc = e.Location;
+        float density = 1f;
+        try
+        {
+            var canvasSize = _canvas.CanvasSize; // pixels
+            if (_canvas.Width > 0)
+                density = (float)(canvasSize.Width / (float)_canvas.Width);
+        }
+        catch { }
+        var touchPx = new SKPoint((float)loc.X * density, (float)loc.Y * density);
+
+        var pagePt = new SKPoint((float)((touchPx.X - _pageOffsetX) / _pageScale), (float)((touchPx.Y - _pageOffsetY) / _pageScale));
         var isCover = CoverSwitch.IsToggled;
         var hitRect = isCover ? _lastContentRect : _lastPhotoRect;
 
@@ -589,9 +679,12 @@ public partial class DesignerPage : ContentPage
                         _startZoom = asset.Zoom;
                         _dragIsCover = isCover;
                         e.Handled = true;
+                        _canvas.InvalidateSurface();
                         return;
                     }
                 }
+                // Just a press on an empty slot: highlight selection
+                _canvas.InvalidateSurface();
                 break;
             case SKTouchAction.Moved:
                 if (_isDragging && asset != null)

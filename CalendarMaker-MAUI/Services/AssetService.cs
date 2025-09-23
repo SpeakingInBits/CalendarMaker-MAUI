@@ -40,14 +40,7 @@ public sealed class AssetService : IAssetService
             await src.CopyToAsync(dst);
         }
 
-        // Remove existing photo for this month if present
-        var existing = project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex);
-        if (existing != null)
-        {
-            project.ImageAssets.Remove(existing);
-            try { if (File.Exists(existing.Path)) File.Delete(existing.Path); } catch { }
-        }
-
+        // Do not remove other month photos; multi-slot months are supported now
         var asset = new ImageAsset
         {
             ProjectId = project.Id,
