@@ -1,6 +1,5 @@
 using CalendarMaker_MAUI.Models;
 using CalendarMaker_MAUI.ViewModels;
-using Microsoft.Maui.ApplicationModel;
 
 namespace CalendarMaker_MAUI.Views;
 
@@ -21,14 +20,14 @@ public partial class ProjectsPage : ContentPage
 
     private async Task OnNewProjectClicked()
     {
-        var preset = await DisplayActionSheet("Create Project", "Cancel", null,
+        var preset = await this.DisplayActionSheetAsync("Create Project", "Cancel", null,
             "5x7 Landscape 50/50 (Photo Left)",
             "Letter Portrait 50/50 (Photo Top)");
         if (preset is null || preset == "Cancel") return;
 
-        var name = await DisplayPromptAsync("Project Name", "Enter a name:", initialValue: "My Calendar");
+        var name = await this.DisplayPromptAsync("Project Name", "Enter a name:", initialValue: "My Calendar");
         if (string.IsNullOrWhiteSpace(name)) name = "My Calendar";
-        var yearText = await DisplayPromptAsync("Year", "Enter calendar year:", initialValue: DateTime.Now.Year.ToString());
+        var yearText = await this.DisplayPromptAsync("Year", "Enter calendar year:", initialValue: DateTime.Now.Year.ToString());
         var year = DateTime.Now.Year;
         _ = int.TryParse(yearText, out year);
 
@@ -63,7 +62,7 @@ public partial class ProjectsPage : ContentPage
     {
         if (sender is Button btn && btn.CommandParameter is CalendarProject proj)
         {
-            var confirm = await DisplayAlert("Delete Project", $"Delete '{proj.Name}'? This removes all its files.", "Delete", "Cancel");
+            var confirm = await this.DisplayAlertAsync("Delete Project", $"Delete '{proj.Name}'? This removes all its files.", "Delete", "Cancel");
             if (confirm)
             {
                 await _vm.DeleteProjectAsync(proj);
