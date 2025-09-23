@@ -89,9 +89,9 @@
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Export" FontAttributes="Bold" />
-                <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
-                <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" Clicked="OnExportCoverClicked" />
-                <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" Clicked="OnExportYearClicked" />
+                <Button Text="Export Month (PDF)" x:Name="ExportBtn" />
+                <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" />
+                <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" />
                 <Button Text="Back" x:Name="BackBtn" />
             </VerticalStackLayout>
         </ScrollView>
