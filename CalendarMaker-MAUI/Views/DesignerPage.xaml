@@ -3,27 +3,62 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CalendarMaker_MAUI.Views.DesignerPage"
              Title="Designer">
-    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="220,*" ColumnSpacing="12">
-        <VerticalStackLayout Grid.Column="0" Spacing="10">
-            <Label Text="Designer" FontAttributes="Bold" />
-            <HorizontalStackLayout Spacing="6">
-                <Button Text="Prev" x:Name="PrevBtn" />
-                <Label x:Name="MonthLabel" VerticalTextAlignment="Center" />
-                <Button Text="Next" x:Name="NextBtn" />
-            </HorizontalStackLayout>
-            <HorizontalStackLayout Spacing="8">
-                <Label Text="Cover Page" VerticalTextAlignment="Center" />
-                <Switch x:Name="CoverSwitch" />
-            </HorizontalStackLayout>
-            <Button Text="Add Photo" x:Name="AddPhotoBtn" />
-            <Button Text="Add Cover Photo" x:Name="AddCoverPhotoBtn" />
-            <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
-            <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
-            <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
-            <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" Clicked="OnExportCoverClicked" />
-            <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" Clicked="OnExportYearClicked" />
-            <Button Text="Back" x:Name="BackBtn" />
-        </VerticalStackLayout>
+    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="260,*" ColumnSpacing="12">
+        <ScrollView Grid.Column="0">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Designer" FontAttributes="Bold" />
+                <HorizontalStackLayout Spacing="6">
+                    <Button Text="Prev" x:Name="PrevBtn" />
+                    <Label x:Name="MonthLabel" VerticalTextAlignment="Center" />
+                    <Button Text="Next" x:Name="NextBtn" />
+                </HorizontalStackLayout>
+
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" >
+                    <Label Text="Cover Page" VerticalTextAlignment="Center" />
+                    <Switch x:Name="CoverSwitch" Grid.Column="1" />
+                </Grid>
+                <Button Text="Add Photo" x:Name="AddPhotoBtn" />
+                <Button Text="Add Cover Photo" x:Name="AddCoverPhotoBtn" />
+                <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
+                <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
+
+                <BoxView HeightRequest="1" Color="#DDD" />
+                <Label Text="Layout" FontAttributes="Bold" />
+                <Button Text="Flip Layout" x:Name="FlipBtn" />
+                <Grid ColumnDefinitions="Auto,* ,Auto" RowDefinitions="Auto">
+                    <Label Text="Split" />
+                    <Slider x:Name="SplitSlider" Grid.Column="1" Minimum="0.3" Maximum="0.7" />
+                    <Label x:Name="SplitValueLabel" Grid.Column="2" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
+                    <Label Text="Fill Mode" />
+                    <Picker x:Name="FillModePicker" Grid.Column="1">
+                        <Picker.Items>
+                            <x:String>Cover</x:String>
+                            <x:String>Contain</x:String>
+                        </Picker.Items>
+                    </Picker>
+                </Grid>
+
+                <BoxView HeightRequest="1" Color="#DDD" />
+                <Label Text="Calendar" FontAttributes="Bold" />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
+                    <Label Text="Start Month" />
+                    <Picker x:Name="StartMonthPicker" Grid.Column="1"/>
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
+                    <Label Text="First Day of Week" />
+                    <Picker x:Name="FirstDowPicker" Grid.Column="1"/>
+                </Grid>
+
+                <BoxView HeightRequest="1" Color="#DDD" />
+                <Label Text="Export" FontAttributes="Bold" />
+                <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
+                <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" Clicked="OnExportCoverClicked" />
+                <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" Clicked="OnExportYearClicked" />
+                <Button Text="Back" x:Name="BackBtn" />
+            </VerticalStackLayout>
+        </ScrollView>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">
             <ContentView x:Name="CanvasHost" />
         </Border>

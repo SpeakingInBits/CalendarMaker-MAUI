@@ -43,7 +43,36 @@ public partial class DesignerPage : ContentPage
         TitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.TitleText = TitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         SubtitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.SubtitleText = SubtitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
 
+        FlipBtn.Clicked += (_, __) => FlipLayout();
+        SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        FillModePicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.LayoutSpec.PhotoFill = FillModePicker.SelectedIndex == 0 ? PhotoFillMode.Cover : PhotoFillMode.Contain; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _monthIndex = 0; UpdateMonthLabel(); _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        FirstDowPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.FirstDayOfWeek = (DayOfWeek)FirstDowPicker.SelectedIndex; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+
         _monthIndex = 0; // start with first month
+        PopulateStaticPickers();
+    }
+
+    private void PopulateStaticPickers()
+    {
+        StartMonthPicker.ItemsSource = Enumerable.Range(1, 12).Select(i => new DateTime(2000, i, 1).ToString("MMMM", CultureInfo.InvariantCulture)).ToList();
+        FirstDowPicker.ItemsSource = Enum.GetNames(typeof(DayOfWeek));
+    }
+
+    private void FlipLayout()
+    {
+        if (_project == null) return;
+        var p = _project.LayoutSpec.Placement;
+        _project.LayoutSpec.Placement = p switch
+        {
+            LayoutPlacement.PhotoLeftCalendarRight => LayoutPlacement.PhotoRightCalendarLeft,
+            LayoutPlacement.PhotoRightCalendarLeft => LayoutPlacement.PhotoLeftCalendarRight,
+            LayoutPlacement.PhotoTopCalendarBottom => LayoutPlacement.PhotoBottomCalendarTop,
+            LayoutPlacement.PhotoBottomCalendarTop => LayoutPlacement.PhotoTopCalendarBottom,
+            _ => p
+        };
+        _ = _storage.UpdateProjectAsync(_project);
+        _canvas.InvalidateSurface();
     }
 
     private async Task PickAndAssignCoverPhotoAsync()
@@ -127,6 +156,11 @@ public partial class DesignerPage : ContentPage
             {
                 TitleEntry.Text = _project.CoverSpec.TitleText;
                 SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
+                SplitSlider.Value = _project.LayoutSpec.SplitRatio;
+                SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
+                FillModePicker.SelectedIndex = _project.LayoutSpec.PhotoFill == PhotoFillMode.Cover ? 0 : 1;
+                StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
+                FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
             }
             UpdateMonthLabel();
             _canvas.InvalidateSurface();
