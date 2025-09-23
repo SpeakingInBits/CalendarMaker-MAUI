@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CalendarMaker_MAUI.Views.DesignerPage"
+             Title="Designer">
+    <Grid RowDefinitions="Auto,*" Padding="12" ColumnDefinitions="200,*" ColumnSpacing="12">
+        <VerticalStackLayout Grid.Column="0" Spacing="10">
+            <Label Text="Designer" FontAttributes="Bold" />
+            <Button Text="Back" x:Name="BackBtn" />
+        </VerticalStackLayout>
+        <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">
+            <ContentView x:Name="CanvasHost" />
+        </Border>
+    </Grid>
+</ContentPage>

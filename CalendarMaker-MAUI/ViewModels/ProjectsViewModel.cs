@@ -37,4 +37,11 @@ public partial class ProjectsViewModel : ObservableObject
         await _storage.CreateProjectAsync(project);
         await LoadAsync();
     }
+
+    [RelayCommand]
+    public async Task DeleteProjectAsync(CalendarProject project)
+    {
+        await _storage.DeleteProjectAsync(project.Id);
+        await LoadAsync();
+    }
 }

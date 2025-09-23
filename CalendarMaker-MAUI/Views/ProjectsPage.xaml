@@ -5,14 +5,20 @@
              Title="Projects">
     <VerticalStackLayout Padding="16" Spacing="12">
         <Button Text="Create Default Project" x:Name="CreateBtn" />
-        <CollectionView x:Name="ProjectsList">
+        <CollectionView x:Name="ProjectsList" SelectionMode="Single">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <Frame Padding="8" Margin="0,6" HasShadow="False" BorderColor="LightGray">
-                        <VerticalStackLayout>
-                            <Label Text="{Binding Name}" FontAttributes="Bold" />
-                            <Label Text="{Binding Year}" />
-                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <VerticalStackLayout>
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label Text="{Binding Year}" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                <Button Text="Open" CommandParameter="{Binding .}" Clicked="OnOpenClicked" />
+                                <Button Text="Delete" CommandParameter="{Binding .}" Clicked="OnDeleteClicked" />
+                            </HorizontalStackLayout>
+                        </Grid>
                     </Frame>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

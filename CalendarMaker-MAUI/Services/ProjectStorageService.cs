@@ -6,6 +6,7 @@ public interface IProjectStorageService
 {
     Task<string> CreateProjectAsync(CalendarProject project);
     Task<IReadOnlyList<CalendarProject>> GetProjectsAsync();
+    Task DeleteProjectAsync(string projectId);
 }
 
 public sealed class ProjectStorageService : IProjectStorageService
@@ -48,5 +49,16 @@ public sealed class ProjectStorageService : IProjectStorageService
             }
         }
         return result;
+    }
+
+    public Task DeleteProjectAsync(string projectId)
+    {
+        var dir = Path.Combine(_root, projectId);
+        if (Directory.Exists(dir))
+        {
+            try { Directory.Delete(dir, recursive: true); }
+            catch { /* swallow for now; could log */ }
+        }
+        return Task.CompletedTask;
     }
 }
