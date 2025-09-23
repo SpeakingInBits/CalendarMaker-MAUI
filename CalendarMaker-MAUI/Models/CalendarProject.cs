@@ -18,6 +18,9 @@ public sealed class CalendarProject
 
     public List<ImageAsset> ImageAssets { get; set; } = new();
 
+    // Optional per-month photo layout override (0..11 month index relative to StartMonth)
+    public Dictionary<int, PhotoLayout> MonthPhotoLayouts { get; set; } = new();
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 }

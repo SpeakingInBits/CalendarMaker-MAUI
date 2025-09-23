@@ -45,6 +45,17 @@
                         </Border.GestureRecognizers>
                     </Border>
                 </Grid>
+                <!-- Photo layout picker -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
+                    <Label Text="Photo Layout" />
+                    <Picker x:Name="PhotoLayoutPicker" Grid.Column="1" HorizontalOptions="FillAndExpand" >
+                        <Picker.Items>
+                            <x:String>Single</x:String>
+                            <x:String>Two (vertical split)</x:String>
+                            <x:String>Grid 2x2 (4)</x:String>
+                        </Picker.Items>
+                    </Picker>
+                </Grid>
                 <!-- Zoom slider with reset -->
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
                     <Label Text="Photo Zoom" />
@@ -85,7 +96,7 @@
             </VerticalStackLayout>
         </ScrollView>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">
-            <ContentView x:Name="CanvasHost" />
+            <ContentView x:Name="CanvasHost" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" />
         </Border>
     </Grid>
 </ContentPage>
