@@ -1,6 +1,7 @@
 using System.Globalization;
 using CalendarMaker_MAUI.Models;
 using CalendarMaker_MAUI.Services;
+using CommunityToolkit.Maui.Storage;
 using Microsoft.Maui.Storage;
 using SkiaSharp;
 using SkiaSharp.Views.Maui.Controls;
@@ -16,6 +17,7 @@ public partial class DesignerPage : ContentPage
     private readonly IAssetService _assets;
     private readonly IPdfExportService _pdf;
     private readonly SKCanvasView _canvas;
+
     private int _monthIndex; // 0..11 relative to StartMonth
 
     public string? ProjectId { get; set; }
@@ -65,18 +67,37 @@ public partial class DesignerPage : ContentPage
 
     private async void OnExportClicked(object? sender, EventArgs e)
     {
-        await ExportCurrentMonthAsync();
+        if (_project == null) return;
+        var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
+        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
+        var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
+        await SaveBytesAsync(fileName, bytes);
     }
 
     private async void OnExportCoverClicked(object? sender, EventArgs e)
     {
         if (_project == null) return;
         var bytes = await _pdf.ExportCoverAsync(_project);
-        var dir = FileSystem.Current.AppDataDirectory;
         var fileName = $"Calendar_{_project.Year}_Cover.pdf";
-        var path = Path.Combine(dir, fileName);
-        await File.WriteAllBytesAsync(path, bytes);
-        await Share.RequestAsync(new ShareFileRequest { Title = "Exported PDF", File = new ShareFile(path) });
+        await SaveBytesAsync(fileName, bytes);
+    }
+
+    private async void OnExportYearClicked(object? sender, EventArgs e)
+    {
+        if (_project == null) return;
+        var bytes = await _pdf.ExportYearAsync(_project, includeCover: true);
+        var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
+        await SaveBytesAsync(fileName, bytes);
+    }
+
+    private async Task SaveBytesAsync(string suggestedFileName, byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        var result = await FileSaver.Default.SaveAsync(suggestedFileName, stream, default);
+        if (!result.IsSuccessful)
+        {
+            await DisplayAlert("Save Failed", result.Exception?.Message ?? "Unknown error", "OK");
+        }
     }
 
     private async Task ExportCurrentMonthAsync()

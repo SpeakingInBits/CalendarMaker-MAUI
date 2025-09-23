@@ -10,29 +10,58 @@ public interface IPdfExportService
 {
     Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex);
     Task<byte[]> ExportCoverAsync(CalendarProject project);
+    Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true);
 }
 
 public sealed class PdfExportService : IPdfExportService
 {
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
-    {
-        return RenderToPdfAsync(project, monthIndex, renderCover: false);
-    }
+        => RenderDocumentAsync(project, new[] { (monthIndex, false) });
 
     public Task<byte[]> ExportCoverAsync(CalendarProject project)
+        => RenderDocumentAsync(project, new[] { (0, true) });
+
+    public Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true)
     {
-        return RenderToPdfAsync(project, 0, renderCover: true);
+        var pages = new List<(int idx, bool cover)>();
+        if (includeCover) pages.Add((0, true));
+        for (int i = 0; i < 12; i++) pages.Add((i, false));
+        return RenderDocumentAsync(project, pages);
     }
 
-    private Task<byte[]> RenderToPdfAsync(CalendarProject project, int monthIndex, bool renderCover)
+    private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
-        var pageDims = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
-        float pageWpt = (float)pageDims.widthPt;
-        float pageHpt = (float)pageDims.heightPt;
+        var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
+        float pageWpt = (float)wPtD;
+        float pageHpt = (float)hPtD;
         if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
 
+        // Pre-render bitmaps (PNG bytes) for each requested page
+        var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt)).ToList();
+
+        var doc = Document.Create(container =>
+        {
+            foreach (var img in rendered)
+            {
+                container.Page(page =>
+                {
+                    page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
+                    page.Margin(0);
+                    page.DefaultTextStyle(x => x.FontSize(12));
+                    page.Content().Image(img).FitArea();
+                });
+            }
+        });
+
+        using var stream = new MemoryStream();
+        doc.GeneratePdf(stream);
+        return Task.FromResult(stream.ToArray());
+    }
+
+    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt)
+    {
         using var skSurface = SKSurface.Create(new SKImageInfo((int)pageWpt, (int)pageHpt, SKColorType.Bgra8888, SKAlphaType.Premul));
         var sk = skSurface.Canvas;
         sk.Clear(SKColors.White);
@@ -54,22 +83,7 @@ public sealed class PdfExportService : IPdfExportService
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
         using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
-        var imageBytes = data.ToArray();
-
-        var doc = Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
-                page.Margin(0);
-                page.DefaultTextStyle(x => x.FontSize(12));
-                page.Content().Image(imageBytes).FitArea();
-            });
-        });
-
-        using var stream = new MemoryStream();
-        doc.GeneratePdf(stream);
-        return Task.FromResult(stream.ToArray());
+        return data.ToArray();
     }
 
     private static (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
@@ -194,7 +208,6 @@ public sealed class PdfExportService : IPdfExportService
             canvas.DrawRect(bounds, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
         }
 
-        // Title / Subtitle
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
         using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
         var title = project.CoverSpec.TitleText ?? string.Empty;

@@ -14,7 +14,8 @@ Scope (v1)
   - 5x7 in Landscape: vertical split (left/right) at 50/50; default placement: Photo left, Calendar right; user can flip sides.
   - Letter in Portrait: horizontal split (top/bottom) at 50/50; default placement: Photo top, Calendar bottom; user can flip halves.
 - Templates: Developer-authored (not user-editable), templating fonts/colors/headers/photo slot/grid styling.
-- Photos: At least one photo per month; fill modes (cover/contain), alignment; optional background color; drag-and-drop photo import on Windows.
+- Photos: At least one photo per month; fill modes (cover/contain), alignment; optional background color.
+  - Drag-and-drop import on Windows: Deferred to a later milestone (post-v1) using platform-specific handlers.
 - Fonts: Use system fonts initially (Segoe UI by default); allow uploading custom font files per project. Embed fonts in PDF when license/embedding flags allow; otherwise fall back to non-embedded or require an uploaded embeddable font.
 - Export: QuestPDF vector output; page sizes 5x7, A4, Letter, 11x17, 13x19; orientation; margins (no bleed/crop marks).
 - Privacy: Strictly offline, no telemetry; no downscaling on import (scale only at render time); assume sRGB color space.
@@ -31,7 +32,7 @@ Architecture
   - TemplateService (register/dev templates), ThemeService (fonts/colors/styles).
   - LayoutService (split ratios, photo placement, cover grid presets, default presets per page size).
   - RenderService (SkiaSharp preview), PdfExportService (QuestPDF shared layout primitives).
-  - ProjectStorageService (create/open/export/import as zip), AssetService (images/fonts; drag-and-drop integration on Windows).
+  - ProjectStorageService (create/open/export/import as zip), AssetService (images/fonts).
 - Rendering pipeline:
   - Shared layout primitives (grid, header, photo region, day cells) used by both Skia preview and QuestPDF export.
   - Margins handled consistently; assume sRGB imagery and colors.
@@ -60,8 +61,8 @@ Pages & Sizes
 UI/Flows
 - Projects: list/create/open/duplicate/export/import (zip with JSON + assets).
 - New Project: year, start month, first day (default Sunday), size/orientation, margins (default 0.2 in), template, fonts/colors, layout selection (placement + split ratio), default preset picker.
-- Designer/Preview: parameter panel (fonts/colors/margins/layout/photo selection); live Skia preview; month switcher; cover preview; drag-and-drop images onto photo regions.
-- Export: PDF settings (page range, embed fonts when permitted).
+- Designer/Preview: parameter panel (fonts/colors/margins/layout/photo selection); live Skia preview; month switcher; cover preview.
+- Export: PDF settings (page range, embed fonts when permitted); export single month, cover, or full year.
 
 Fonts
 - System fonts (Windows defaults) available; add custom fonts per project by uploading files; embed registered fonts into PDF via QuestPDF when allowed by the font's embedding rights.
@@ -74,11 +75,12 @@ Milestones
 1) Bootstrap app, DI, models, SQLite init, navigation.
 2) CalendarEngine + monthly grid + first template (PhotoMonthlyClassic) without events.
 3) Skia preview of one month; page sizes/margins and split layouts (top/bottom/left/right); default presets for 5x7 Landscape and Letter Portrait.
-4) Photo handling: drag-and-drop; per-month photo selection; cover page (single and 2x3 grid) with customizable title/subtitle preview.
+4) Photo handling: per-month photo selection; cover page (single and 2x3 grid) with customizable title/subtitle preview.
 5) QuestPDF export: full year + cover; font embedding where permitted.
 6) Project storage and zip import/export; asset management (images/fonts).
 7) Templates and theming parameters (fonts/colors/headers); user settings UI.
-8) Tests: unit (engine/layout) and UI tests (Windows) for critical flows; golden-image checks for layout.
+8) Drag-and-drop image import on Windows (platform handlers) — deferred post-v1.
+9) Tests: unit (engine/layout) and UI tests (Windows) for critical flows; golden-image checks for layout.
 
 Future (post-v1)
 - Events, categories, recurrence editor, US federal holidays overlay and styling.

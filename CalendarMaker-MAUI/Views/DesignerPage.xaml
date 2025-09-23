@@ -21,6 +21,7 @@
             <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
             <Button Text="Export Month (PDF)" x:Name="ExportBtn" Clicked="OnExportClicked" />
             <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" Clicked="OnExportCoverClicked" />
+            <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" Clicked="OnExportYearClicked" />
             <Button Text="Back" x:Name="BackBtn" />
         </VerticalStackLayout>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">
