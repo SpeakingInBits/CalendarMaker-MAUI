@@ -58,8 +58,8 @@ public partial class DesignerPage : ContentPage
         BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
         PrevBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 11) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
         NextBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 1) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
-        AddPhotoBtn.Clicked += async (_, __) => await PickAndAssignPhotoAsync();
-        AddCoverPhotoBtn.Clicked += async (_, __) => await PickAndAssignCoverPhotoAsync();
+        AddPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
+        AddCoverPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
         ExportBtn.Clicked += OnExportClicked;
         ExportCoverBtn.Clicked += OnExportCoverClicked;
         ExportYearBtn.Clicked += OnExportYearClicked;
@@ -78,45 +78,80 @@ public partial class DesignerPage : ContentPage
         PopulateStaticPickers();
     }
 
-    private async void OnCanvasDrop(object? sender, DropEventArgs e)
-    {
-        try
-        {
-            // Cross-platform drag & drop ingestion to be implemented per-platform.
-            // For now, rely on the Add Photo button; this handler is a no-op to avoid build issues on non-Windows targets.
-        }
-        catch { }
-    }
-
-    private async Task RemoveExistingAssetsForSlotAsync(int monthIndex, int slotIndex)
+    private async Task ImportPhotosToProjectAsync()
     {
         if (_project == null) return;
-        var toRemove = _project.ImageAssets
-            .Where(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex && (a.SlotIndex ?? 0) == slotIndex)
-            .ToList();
-        foreach (var ex in toRemove)
+        
+        var results = await FilePicker.PickMultipleAsync(new PickOptions 
+        { 
+            PickerTitle = "Select photos to add to project", 
+            FileTypes = FilePickerFileType.Images 
+        });
+        
+        if (results == null || !results.Any()) return;
+
+        foreach (var result in results)
         {
-            _project.ImageAssets.Remove(ex);
-            try { if (!string.IsNullOrEmpty(ex.Path) && File.Exists(ex.Path)) File.Delete(ex.Path); } catch { }
+            await _assets.ImportProjectPhotoAsync(_project, result);
         }
-        await _storage.UpdateProjectAsync(_project);
+        
+        // Refresh the display
+        _canvas.InvalidateSurface();
     }
 
-    private async Task ImportPhotoFromPathAsync(string path)
+    private async Task ShowPhotoSelectorAsync()
     {
         if (_project == null) return;
-        // Ensure we replace any existing asset for this slot
-        await RemoveExistingAssetsForSlotAsync(_monthIndex, _activeSlotIndex);
-
-        var fileResult = new FileResult(path);
-        var asset = await _assets.ImportMonthPhotoAsync(_project, _monthIndex, fileResult);
-        if (asset != null)
+        
+        var unassignedPhotos = await _assets.GetUnassignedPhotosAsync(_project);
+        if (!unassignedPhotos.Any())
         {
-            asset.Role = "monthPhoto";
-            asset.MonthIndex = _monthIndex;
-            asset.SlotIndex = _activeSlotIndex;
-            asset.PanX = asset.PanY = 0; asset.Zoom = 1;
-            await _storage.UpdateProjectAsync(_project);
+            await DisplayAlert("No Photos", "Please import some photos first using the Add Photos button.", "OK");
+            return;
+        }
+
+        // Create a simple action sheet with photo names/IDs for now
+        // In a full implementation, you'd want a proper modal with photo thumbnails
+        var photoOptions = unassignedPhotos.Select(p => $"Photo {p.Id[..8]}...").ToArray();
+        var allOptions = photoOptions.Concat(new[] { "Remove Photo", "Cancel" }).ToArray();
+        
+        var result = await DisplayActionSheet("Choose Photo", "Cancel", null, allOptions);
+        
+        if (result == "Cancel" || result == null) return;
+        
+        if (result == "Remove Photo")
+        {
+            // Remove photo from current slot
+            var role = CoverSwitch.IsToggled ? "coverPhoto" : "monthPhoto";
+            if (CoverSwitch.IsToggled)
+            {
+                var existingCover = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
+                if (existingCover != null)
+                {
+                    existingCover.Role = "unassigned";
+                    existingCover.MonthIndex = null;
+                    existingCover.SlotIndex = null;
+                    await _storage.UpdateProjectAsync(_project);
+                    _canvas.InvalidateSurface();
+                }
+            }
+            else
+            {
+                await _assets.RemovePhotoFromSlotAsync(_project, _monthIndex, _activeSlotIndex, role);
+                _canvas.InvalidateSurface();
+            }
+            return;
+        }
+
+        // Find selected photo
+        var selectedIndex = Array.IndexOf(photoOptions, result);
+        if (selectedIndex >= 0 && selectedIndex < unassignedPhotos.Count)
+        {
+            var selectedPhoto = unassignedPhotos[selectedIndex];
+            var role = CoverSwitch.IsToggled ? "coverPhoto" : "monthPhoto";
+            var slotIndex = CoverSwitch.IsToggled ? (int?)null : _activeSlotIndex;
+            
+            await _assets.AssignPhotoToSlotAsync(_project, selectedPhoto.Id, _monthIndex, slotIndex, role);
             SyncZoomUI();
             _canvas.InvalidateSurface();
         }
@@ -157,23 +192,19 @@ public partial class DesignerPage : ContentPage
             if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
             {
                 var items = await e.DataView.GetStorageItemsAsync();
-                var file = items.OfType<Windows.Storage.StorageFile>().FirstOrDefault();
-                if (file != null)
+                var files = items.OfType<Windows.Storage.StorageFile>().ToList();
+                if (files.Any() && _project != null)
                 {
-                    var fe = sender as Microsoft.Maui.Platform.ContentPanel;
-                    var posDip = e.GetPosition((Microsoft.UI.Xaml.UIElement)sender);
-                    double scale = fe?.XamlRoot?.RasterizationScale ?? 1.0;
-                    // Convert DIPs to device pixels to match Skia e.Info units
-                    var px = posDip.X * scale;
-                    var py = posDip.Y * scale;
-                    var pagePt = new SKPoint((float)((px - _pageOffsetX) / _pageScale), (float)((py - _pageOffsetY) / _pageScale));
-
-                    if (!CoverSwitch.IsToggled && _lastPhotoSlots.Count > 0)
+                    // Import all dropped files to project gallery
+                    foreach (var file in files)
                     {
-                        var idx = _lastPhotoSlots.FindIndex(r => r.Contains(pagePt));
-                        _activeSlotIndex = idx >= 0 ? idx : 0;
+                        if (file.ContentType?.StartsWith("image/") == true)
+                        {
+                            var fileResult = new FileResult(file.Path);
+                            await _assets.ImportProjectPhotoAsync(_project, fileResult);
+                        }
                     }
-                    await ImportPhotoFromPathAsync(file.Path);
+                    _canvas.InvalidateSurface();
                     e.Handled = true;
                 }
             }
@@ -194,8 +225,11 @@ public partial class DesignerPage : ContentPage
             if (!CoverSwitch.IsToggled && _lastPhotoSlots.Count > 0)
             {
                 var idx = _lastPhotoSlots.FindIndex(r => r.Contains(pagePt));
-                _activeSlotIndex = idx >= 0 ? idx : 0;
-                _canvas.InvalidateSurface();
+                if (idx >= 0)
+                {
+                    _activeSlotIndex = idx;
+                    _canvas.InvalidateSurface();
+                }
             }
         }
         catch { }
@@ -293,23 +327,6 @@ public partial class DesignerPage : ContentPage
         _canvas.InvalidateSurface();
     }
 
-    private async Task PickAndAssignCoverPhotoAsync()
-    {
-        if (_project == null) return;
-        var result = await FilePicker.PickAsync(new PickOptions { PickerTitle = "Select a cover photo", FileTypes = FilePickerFileType.Images });
-        if (result == null) return;
-        var asset = await _assets.ImportMonthPhotoAsync(_project, -1, result);
-        if (asset != null)
-        {
-            asset.Role = "coverPhoto";
-            asset.MonthIndex = null;
-            asset.PanX = asset.PanY = 0; asset.Zoom = 1;
-            await _storage.UpdateProjectAsync(_project);
-            SyncZoomUI();
-            _canvas.InvalidateSurface();
-        }
-    }
-
     private async void OnExportClicked(object? sender, EventArgs e)
     {
         if (_project == null) return;
@@ -321,7 +338,8 @@ public partial class DesignerPage : ContentPage
 
     private async void OnExportCoverClicked(object? sender, EventArgs e)
     {
-        if (_project == null) return;
+        if (_project == null)
+            return;
         var bytes = await _pdf.ExportCoverAsync(_project);
         var fileName = $"Calendar_{_project.Year}_Cover.pdf";
         await SaveBytesAsync(fileName, bytes);
@@ -409,28 +427,6 @@ public partial class DesignerPage : ContentPage
         {
             asset.Zoom = Math.Clamp(newValue, ZoomSlider.Minimum, ZoomSlider.Maximum);
             _ = _storage.UpdateProjectAsync(_project);
-            _canvas.InvalidateSurface();
-        }
-    }
-
-    private async Task PickAndAssignPhotoAsync()
-    {
-        if (_project == null) return;
-        var result = await FilePicker.PickAsync(new PickOptions { PickerTitle = "Select a photo", FileTypes = FilePickerFileType.Images });
-        if (result == null) return;
-
-        // Ensure we replace any existing asset for this slot
-        await RemoveExistingAssetsForSlotAsync(_monthIndex, _activeSlotIndex);
-
-        var asset = await _assets.ImportMonthPhotoAsync(_project, _monthIndex, result);
-        if (asset != null)
-        {
-            asset.Role = "monthPhoto";
-            asset.MonthIndex = _monthIndex;
-            asset.SlotIndex = _activeSlotIndex;
-            asset.PanX = asset.PanY = 0; asset.Zoom = 1;
-            await _storage.UpdateProjectAsync(_project);
-            SyncZoomUI();
             _canvas.InvalidateSurface();
         }
     }
@@ -531,6 +527,15 @@ public partial class DesignerPage : ContentPage
                 using var photoBorder = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
                 canvas.DrawRect(rect, photoFill);
                 canvas.DrawRect(rect, photoBorder);
+                
+                // Draw hint text for double-click
+                if (i == _activeSlotIndex)
+                {
+                    using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 12, IsAntialias = true };
+                    var hintText = "Double-click to assign photo";
+                    var textWidth = hintPaint.MeasureText(hintText);
+                    canvas.DrawText(hintText, rect.MidX - textWidth / 2, rect.MidY, hintPaint);
+                }
             }
             else
             {
@@ -569,6 +574,12 @@ public partial class DesignerPage : ContentPage
         {
             using var fill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
             canvas.DrawRect(bounds, fill);
+            
+            // Draw hint for cover photo
+            using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 16, IsAntialias = true };
+            var hintText = "Double-click to assign cover photo";
+            var textWidth = hintPaint.MeasureText(hintText);
+            canvas.DrawText(hintText, bounds.MidX - textWidth / 2, bounds.MidY, hintPaint);
         }
 
         // subtitle hint
@@ -578,12 +589,6 @@ public partial class DesignerPage : ContentPage
         var text = "Drag to reposition • Double-tap to center • Use zoom";
         var tw = hint.MeasureText(text);
         canvas.DrawText(text, bounds.MidX - tw / 2, bounds.Top + 40, hint);
-    }
-
-    private void DrawPhoto(SKCanvas canvas, SKRect rect)
-    {
-        // not used anymore for multi-photo; kept for compatibility if needed
-        DrawPhotos(canvas, new List<SKRect> { rect });
     }
 
     private void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
@@ -708,19 +713,22 @@ public partial class DesignerPage : ContentPage
                     e.Handled = true;
                     return;
                 }
-                // detect double-click to reset
+                // detect double-click to show photo selector
                 if (targetRect.Contains(pagePt))
                 {
                     var now = DateTime.UtcNow;
                     if ((now - _lastTapAt).TotalMilliseconds < 300 && SKPoint.Distance(pagePt, _lastTapPt) < 10)
                     {
-                        if (asset != null)
-                        {
-                            asset.PanX = asset.PanY = 0; asset.Zoom = 1;
-                            SyncZoomUI();
-                            _ = _storage.UpdateProjectAsync(_project);
-                            _canvas.InvalidateSurface();
-                        }
+                        // Double-click detected - show photo selector
+                        _ = ShowPhotoSelectorAsync();
+                    }
+                    else if (asset != null)
+                    {
+                        // Single click on existing photo - reset position/zoom
+                        asset.PanX = asset.PanY = 0; asset.Zoom = 1;
+                        SyncZoomUI();
+                        _ = _storage.UpdateProjectAsync(_project);
+                        _canvas.InvalidateSurface();
                     }
                     _lastTapAt = now;
                     _lastTapPt = pagePt;
