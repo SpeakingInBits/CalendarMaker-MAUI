@@ -15,7 +15,6 @@ public interface IPdfExportService
 
 public sealed class PdfExportService : IPdfExportService
 {
-    // Render target DPI for raster export. Increase for sharper text (larger files).
     private const float TargetDpi = 300f; // 300 DPI print quality
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
@@ -81,12 +80,19 @@ public sealed class PdfExportService : IPdfExportService
 
         if (renderCover)
         {
+            // Clip to keep image overflow hidden
+            sk.Save();
+            sk.ClipRect(contentRect, antialias: true);
             DrawCover(sk, contentRect, project);
+            sk.Restore();
         }
         else
         {
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            sk.Save();
+            sk.ClipRect(photoRect, antialias: true);
             DrawPhoto(sk, photoRect, project, monthIndex);
+            sk.Restore();
             DrawCalendarGrid(sk, calRect, project, monthIndex);
         }
 
@@ -139,33 +145,19 @@ public sealed class PdfExportService : IPdfExportService
         var rectH = rect.Height;
         var imgAspect = imgW / imgH;
         var rectAspect = rectW / rectH;
-        SKRect dest = rect;
+        SKRect dest;
 
-        if (project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+        if (imgAspect > rectAspect)
         {
-            if (imgAspect > rectAspect)
-            {
-                var targetH = rectH; var scale = targetH / imgH; var targetW = imgW * scale; var excess = (targetW - rectW) / 2f;
-                dest = new SKRect(rect.Left - excess, rect.Top, rect.Left - excess + targetW, rect.Top + targetH);
-            }
-            else
-            {
-                var targetW = rectW; var scale = targetW / imgW; var targetH = imgH * scale; var excess = (targetH - rectH) / 2f;
-                dest = new SKRect(rect.Left, rect.Top - excess, rect.Left + targetW, rect.Top - excess + targetH);
-            }
+            var targetH = rectH; var scale = targetH / imgH; var targetW = imgW * scale; var excess = (targetW - rectW) / 2f;
+            var px = (float)Math.Clamp(asset.PanX, -1, 1);
+            dest = new SKRect(rect.Left - excess + px * excess, rect.Top, rect.Left - excess + px * excess + targetW, rect.Top + targetH);
         }
         else
         {
-            if (imgAspect > rectAspect)
-            {
-                var targetW = rectW; var scale = targetW / imgW; var targetH = imgH * scale; var pad = (rectH - targetH) / 2f;
-                dest = new SKRect(rect.Left, rect.Top + pad, rect.Left + targetW, rect.Top + pad + targetH);
-            }
-            else
-            {
-                var targetH = rectH; var scale = targetH / imgH; var targetW = imgW * scale; var pad = (rectW - targetW) / 2f;
-                dest = new SKRect(rect.Left + pad, rect.Top, rect.Left + pad + targetW, rect.Top + targetH);
-            }
+            var targetW = rectW; var scale = targetW / imgW; var targetH = imgH * scale; var excess = (targetH - rectH) / 2f;
+            var py = (float)Math.Clamp(asset.PanY, -1, 1);
+            dest = new SKRect(rect.Left, rect.Top - excess + py * excess, rect.Left + targetW, rect.Top - excess + py * excess + targetH);
         }
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
@@ -183,31 +175,17 @@ public sealed class PdfExportService : IPdfExportService
                 var imgAspect = (float)bmp.Width / (float)bmp.Height;
                 var rectAspect = bounds.Width / bounds.Height;
                 SKRect dest;
-                if (project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+                if (imgAspect > rectAspect)
                 {
-                    if (imgAspect > rectAspect)
-                    {
-                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
-                        dest = new SKRect(bounds.Left - excess, bounds.Top, bounds.Left - excess + targetW, bounds.Top + targetH);
-                    }
-                    else
-                    {
-                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
-                        dest = new SKRect(bounds.Left, bounds.Top - excess, bounds.Left + targetW, bounds.Top - excess + targetH);
-                    }
+                    var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
+                    var px = (float)Math.Clamp(asset.PanX, -1, 1);
+                    dest = new SKRect(bounds.Left - excess + px * excess, bounds.Top, bounds.Left - excess + px * excess + targetW, bounds.Top + targetH);
                 }
                 else
                 {
-                    if (imgAspect > rectAspect)
-                    {
-                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var pad = (bounds.Height - targetH) / 2f;
-                        dest = new SKRect(bounds.Left, bounds.Top + pad, bounds.Left + targetW, bounds.Top + pad + targetH);
-                    }
-                    else
-                    {
-                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var pad = (bounds.Width - targetW) / 2f;
-                        dest = new SKRect(bounds.Left + pad, bounds.Top, bounds.Left + pad + targetW, bounds.Top + targetH);
-                    }
+                    var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
+                    var py = (float)Math.Clamp(asset.PanY, -1, 1);
+                    dest = new SKRect(bounds.Left, bounds.Top - excess + py * excess, bounds.Left + targetW, bounds.Top - excess + py * excess + targetH);
                 }
                 using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
                 canvas.DrawBitmap(bmp, dest, paint);

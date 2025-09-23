@@ -4,6 +4,7 @@ using CalendarMaker_MAUI.Services;
 using CommunityToolkit.Maui.Storage;
 using Microsoft.Maui.Storage;
 using SkiaSharp;
+using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
 
 namespace CalendarMaker_MAUI.Views;
@@ -20,6 +21,17 @@ public partial class DesignerPage : ContentPage
 
     private int _monthIndex; // 0..11 relative to StartMonth
 
+    // gesture helpers
+    private float _pageScale = 1f;
+    private float _pageOffsetX, _pageOffsetY;
+    private SKRect _lastPhotoRect;
+    private SKRect _lastContentRect;
+    private bool _isDragging;
+    private SKPoint _dragStartPagePt;
+    private double _startPanX, _startPanY;
+    private float _dragExcessX, _dragExcessY;
+    private bool _dragIsCover;
+
     public string? ProjectId { get; set; }
 
     public DesignerPage(ICalendarEngine engine, IProjectStorageService storage, IAssetService assets, IPdfExportService pdf)
@@ -31,6 +43,8 @@ public partial class DesignerPage : ContentPage
         _pdf = pdf;
         _canvas = new SKCanvasView();
         _canvas.PaintSurface += Canvas_PaintSurface;
+        _canvas.EnableTouchEvents = true;
+        _canvas.Touch += OnCanvasTouch;
         CanvasHost.Content = _canvas;
 
         BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
@@ -45,7 +59,6 @@ public partial class DesignerPage : ContentPage
 
         FlipBtn.Clicked += (_, __) => FlipLayout();
         SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
-        FillModePicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.LayoutSpec.PhotoFill = FillModePicker.SelectedIndex == 0 ? PhotoFillMode.Cover : PhotoFillMode.Contain; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _monthIndex = 0; UpdateMonthLabel(); _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         FirstDowPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.FirstDayOfWeek = (DayOfWeek)FirstDowPicker.SelectedIndex; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
 
@@ -129,22 +142,6 @@ public partial class DesignerPage : ContentPage
         }
     }
 
-    private async Task ExportCurrentMonthAsync()
-    {
-        if (_project == null) return;
-        var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
-        var dir = FileSystem.Current.AppDataDirectory;
-        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
-        var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
-        var path = Path.Combine(dir, fileName);
-        await File.WriteAllBytesAsync(path, bytes);
-        await Share.RequestAsync(new ShareFileRequest
-        {
-            Title = "Exported PDF",
-            File = new ShareFile(path)
-        });
-    }
-
     protected override async void OnNavigatedTo(NavigatedToEventArgs args)
     {
         base.OnNavigatedTo(args);
@@ -158,7 +155,6 @@ public partial class DesignerPage : ContentPage
                 SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
                 SplitSlider.Value = _project.LayoutSpec.SplitRatio;
                 SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
-                FillModePicker.SelectedIndex = _project.LayoutSpec.PhotoFill == PhotoFillMode.Cover ? 0 : 1;
                 StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
                 FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
             }
@@ -191,7 +187,7 @@ public partial class DesignerPage : ContentPage
         }
     }
 
-    private void Canvas_PaintSurface(object? sender, SkiaSharp.Views.Maui.SKPaintSurfaceEventArgs e)
+    private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
         canvas.Clear(SKColors.White);
@@ -207,6 +203,10 @@ public partial class DesignerPage : ContentPage
         var offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
         var offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
 
+        _pageScale = scale;
+        _pageOffsetX = offsetX;
+        _pageOffsetY = offsetY;
+
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale((float)scale);
@@ -217,6 +217,7 @@ public partial class DesignerPage : ContentPage
 
         var m = _project.Margins;
         var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
+        _lastContentRect = contentRect;
 
         using var contentBorder = new SKPaint { Color = SKColors.Silver, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
         canvas.DrawRect(contentRect, contentBorder);
@@ -224,10 +225,12 @@ public partial class DesignerPage : ContentPage
         if (CoverSwitch.IsToggled)
         {
             DrawCover(canvas, contentRect, _project);
+            _lastPhotoRect = contentRect;
         }
         else
         {
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
+            _lastPhotoRect = photoRect;
             DrawPhoto(canvas, photoRect);
             DrawCalendarGrid(canvas, calRect, _project);
         }
@@ -246,34 +249,23 @@ public partial class DesignerPage : ContentPage
                 var imgAspect = (float)bmp.Width / (float)bmp.Height;
                 var rectAspect = bounds.Width / bounds.Height;
                 SKRect dest;
-                if (project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+                if (imgAspect > rectAspect)
                 {
-                    if (imgAspect > rectAspect)
-                    {
-                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
-                        dest = new SKRect(bounds.Left - excess, bounds.Top, bounds.Left - excess + targetW, bounds.Top + targetH);
-                    }
-                    else
-                    {
-                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
-                        dest = new SKRect(bounds.Left, bounds.Top - excess, bounds.Left + targetW, bounds.Top - excess + targetH);
-                    }
+                    var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
+                    var px = (float)Math.Clamp(asset.PanX, -1, 1);
+                    dest = new SKRect(bounds.Left - excess + px * excess, bounds.Top, bounds.Left - excess + px * excess + targetW, bounds.Top + targetH);
                 }
                 else
                 {
-                    if (imgAspect > rectAspect)
-                    {
-                        var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var pad = (bounds.Height - targetH) / 2f;
-                        dest = new SKRect(bounds.Left, bounds.Top + pad, bounds.Left + targetW, bounds.Top + pad + targetH);
-                    }
-                    else
-                    {
-                        var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var pad = (bounds.Width - targetW) / 2f;
-                        dest = new SKRect(bounds.Left + pad, bounds.Top, bounds.Left + pad + targetW, bounds.Top + targetH);
-                    }
+                    var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
+                    var py = (float)Math.Clamp(asset.PanY, -1, 1);
+                    dest = new SKRect(bounds.Left, bounds.Top - excess + py * excess, bounds.Left + targetW, bounds.Top - excess + py * excess + targetH);
                 }
                 using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
+                canvas.Save();
+                canvas.ClipRect(bounds, antialias: true);
                 canvas.DrawBitmap(bmp, dest, paint);
+                canvas.Restore();
             }
         }
         else
@@ -312,60 +304,32 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
-        // Cover / Contain based on project.LayoutSpec.PhotoFill
-        SKRect dest = rect;
         var imgW = (float)bmp.Width;
         var imgH = (float)bmp.Height;
         var rectW = rect.Width;
         var rectH = rect.Height;
         var imgAspect = imgW / imgH;
         var rectAspect = rectW / rectH;
+        SKRect dest;
 
-        if (_project.LayoutSpec.PhotoFill == PhotoFillMode.Cover)
+        if (imgAspect > rectAspect)
         {
-            // Scale to fill the rect (crop)
-            if (imgAspect > rectAspect)
-            {
-                // Image is wider, crop width
-                var targetH = rectH;
-                var scale = targetH / imgH;
-                var targetW = imgW * scale;
-                var excess = (targetW - rectW) / 2f;
-                dest = new SKRect(rect.Left - excess, rect.Top, rect.Left - excess + targetW, rect.Top + targetH);
-            }
-            else
-            {
-                // Image is taller, crop height
-                var targetW = rectW;
-                var scale = targetW / imgW;
-                var targetH = imgH * scale;
-                var excess = (targetH - rectH) / 2f;
-                dest = new SKRect(rect.Left, rect.Top - excess, rect.Left + targetW, rect.Top - excess + targetH);
-            }
+            var targetH = rectH; var scale = targetH / imgH; var targetW = imgW * scale; var excess = (targetW - rectW) / 2f;
+            var px = (float)Math.Clamp(asset.PanX, -1, 1);
+            dest = new SKRect(rect.Left - excess + px * excess, rect.Top, rect.Left - excess + px * excess + targetW, rect.Top + targetH);
         }
         else
         {
-            // Contain: fully fit into rect (letterbox)
-            if (imgAspect > rectAspect)
-            {
-                var targetW = rectW;
-                var scale = targetW / imgW;
-                var targetH = imgH * scale;
-                var pad = (rectH - targetH) / 2f;
-                dest = new SKRect(rect.Left, rect.Top + pad, rect.Left + targetW, rect.Top + pad + targetH);
-            }
-            else
-            {
-                var targetH = rectH;
-                var scale = targetH / imgH;
-                var targetW = imgW * scale;
-                var pad = (rectW - targetW) / 2f;
-                dest = new SKRect(rect.Left + pad, rect.Top, rect.Left + pad + targetW, rect.Top + targetH);
-            }
+            var targetW = rectW; var scale = targetW / imgW; var targetH = imgH * scale; var excess = (targetH - rectH) / 2f;
+            var py = (float)Math.Clamp(asset.PanY, -1, 1);
+            dest = new SKRect(rect.Left, rect.Top - excess + py * excess, rect.Left + targetW, rect.Top - excess + py * excess + targetH);
         }
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
+        canvas.Save();
+        canvas.ClipRect(rect, antialias: true);
         canvas.DrawBitmap(bmp, dest, paint);
+        canvas.Restore();
     }
 
     private (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
@@ -391,18 +355,15 @@ public partial class DesignerPage : ContentPage
 
     private void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project)
     {
-        // Determine month/year
         var month = ((project.StartMonth - 1 + _monthIndex) % 12) + 1;
         var year = project.Year + (project.StartMonth - 1 + _monthIndex) / 12;
 
         var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
-        // Header area height in points
         float headerH = 40;
         var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
-        // Header text
         using var titlePaint = new SKPaint
         {
             Color = SKColor.Parse(project.Theme.PrimaryTextColor),
@@ -413,12 +374,10 @@ public partial class DesignerPage : ContentPage
         var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
-        // Day of week headers
         float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
 
         string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-        // Rotate based on first day
         int shift = (int)project.FirstDayOfWeek;
         var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
@@ -435,7 +394,6 @@ public partial class DesignerPage : ContentPage
             canvas.DrawRect(cell, gridPen);
         }
 
-        // Weeks grid cells
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         float rowH = weeksArea.Height / rows;
@@ -453,5 +411,78 @@ public partial class DesignerPage : ContentPage
                 }
             }
         }
+    }
+
+    private void OnCanvasTouch(object? sender, SKTouchEventArgs e)
+    {
+        if (_project == null)
+            return;
+
+        // map to page coordinate system
+        var pagePt = new SKPoint((float)((e.Location.X - _pageOffsetX) / _pageScale), (float)((e.Location.Y - _pageOffsetY) / _pageScale));
+        var isCover = CoverSwitch.IsToggled;
+        var hitRect = isCover ? _lastContentRect : _lastPhotoRect;
+
+        if (e.ActionType == SKTouchAction.Pressed)
+        {
+            if (hitRect.Contains(pagePt))
+            {
+                var asset = isCover
+                    ? _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto")
+                    : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    using var bmp = SKBitmap.Decode(asset.Path);
+                    if (bmp != null)
+                    {
+                        // compute excess for current rect
+                        var imgAspect = (float)bmp.Width / (float)bmp.Height;
+                        var rectAspect = hitRect.Width / hitRect.Height;
+                        if (imgAspect > rectAspect)
+                        {
+                            var targetH = hitRect.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; _dragExcessX = (targetW - hitRect.Width) / 2f; _dragExcessY = 0f;
+                        }
+                        else
+                        {
+                            var targetW = hitRect.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; _dragExcessY = (targetH - hitRect.Height) / 2f; _dragExcessX = 0f;
+                        }
+                        _isDragging = true;
+                        _dragStartPagePt = pagePt;
+                        _startPanX = asset.PanX;
+                        _startPanY = asset.PanY;
+                        _dragIsCover = isCover;
+                        e.Handled = true;
+                        return;
+                    }
+                }
+            }
+        }
+        else if (e.ActionType == SKTouchAction.Moved && _isDragging)
+        {
+            var dx = pagePt.X - _dragStartPagePt.X;
+            var dy = pagePt.Y - _dragStartPagePt.Y;
+            var asset = _dragIsCover
+                ? _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto")
+                : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex);
+            if (asset != null)
+            {
+                double newPanX = _startPanX + (_dragExcessX > 0 ? dx / _dragExcessX : 0);
+                double newPanY = _startPanY + (_dragExcessY > 0 ? dy / _dragExcessY : 0);
+                asset.PanX = Math.Clamp(newPanX, -1, 1);
+                asset.PanY = Math.Clamp(newPanY, -1, 1);
+                _canvas.InvalidateSurface();
+            }
+            e.Handled = true;
+            return;
+        }
+        else if ((e.ActionType == SKTouchAction.Released || e.ActionType == SKTouchAction.Cancelled) && _isDragging)
+        {
+            _isDragging = false;
+            _ = _storage.UpdateProjectAsync(_project);
+            e.Handled = true;
+            return;
+        }
+
+        e.Handled = false;
     }
 }
