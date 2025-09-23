@@ -11,4 +11,7 @@ public sealed class ImageAsset
     // Normalized pan offsets (-1..1). 0 = centered.
     public double PanX { get; set; } = 0;
     public double PanY { get; set; } = 0;
+
+    // Zoom multiplier (0.5..3). 1 = fit cover baseline
+    public double Zoom { get; set; } = 1.0;
 }

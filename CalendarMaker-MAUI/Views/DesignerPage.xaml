@@ -30,6 +30,11 @@
                     <Slider x:Name="SplitSlider" Grid.Column="1" Minimum="0.3" Maximum="0.7" />
                     <Label x:Name="SplitValueLabel" Grid.Column="2" />
                 </Grid>
+                <Grid ColumnDefinitions="Auto,* ,Auto" RowDefinitions="Auto">
+                    <Label Text="Photo Zoom" />
+                    <Slider x:Name="ZoomSlider" Grid.Column="1" Minimum="0.5" Maximum="3.0" Value="1" />
+                    <Label x:Name="ZoomValueLabel" Grid.Column="2" />
+                </Grid>
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Calendar" FontAttributes="Bold" />

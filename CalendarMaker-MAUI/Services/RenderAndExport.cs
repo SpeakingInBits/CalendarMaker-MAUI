@@ -81,17 +81,28 @@ public sealed class PdfExportService : IPdfExportService
         if (renderCover)
         {
             // Clip to keep image overflow hidden
-            sk.Save();
-            sk.ClipRect(contentRect, antialias: true);
-            DrawCover(sk, contentRect, project);
+            sk.Save(); sk.ClipRect(contentRect, antialias: true);
+            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
+            if (asset != null && File.Exists(asset.Path))
+            {
+                using var bmp = SKBitmap.Decode(asset.Path);
+                if (bmp != null)
+                    DrawBitmapWithPanZoom(sk, bmp, contentRect, asset);
+            }
             sk.Restore();
+            DrawCoverText(sk, contentRect, project);
         }
         else
         {
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
-            sk.Save();
-            sk.ClipRect(photoRect, antialias: true);
-            DrawPhoto(sk, photoRect, project, monthIndex);
+            sk.Save(); sk.ClipRect(photoRect, antialias: true);
+            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex);
+            if (asset != null && File.Exists(asset.Path))
+            {
+                using var bmp = SKBitmap.Decode(asset.Path);
+                if (bmp != null)
+                    DrawBitmapWithPanZoom(sk, bmp, photoRect, asset);
+            }
             sk.Restore();
             DrawCalendarGrid(sk, calRect, project, monthIndex);
         }
@@ -123,79 +134,33 @@ public sealed class PdfExportService : IPdfExportService
         };
     }
 
-    private static void DrawPhoto(SKCanvas canvas, SKRect rect, CalendarProject project, int monthIndex)
+    private static void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
     {
-        var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == monthIndex);
-        if (asset == null || string.IsNullOrEmpty(asset.Path) || !File.Exists(asset.Path))
-        {
-            canvas.DrawRect(rect, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
-            return;
-        }
-
-        using var bmp = SKBitmap.Decode(asset.Path);
-        if (bmp == null)
-        {
-            canvas.DrawRect(rect, new SKPaint { Color = SKColors.LightGray });
-            return;
-        }
-
         var imgW = (float)bmp.Width;
         var imgH = (float)bmp.Height;
         var rectW = rect.Width;
         var rectH = rect.Height;
         var imgAspect = imgW / imgH;
         var rectAspect = rectW / rectH;
-        SKRect dest;
 
-        if (imgAspect > rectAspect)
-        {
-            var targetH = rectH; var scale = targetH / imgH; var targetW = imgW * scale; var excess = (targetW - rectW) / 2f;
-            var px = (float)Math.Clamp(asset.PanX, -1, 1);
-            dest = new SKRect(rect.Left - excess + px * excess, rect.Top, rect.Left - excess + px * excess + targetW, rect.Top + targetH);
-        }
-        else
-        {
-            var targetW = rectW; var scale = targetW / imgW; var targetH = imgH * scale; var excess = (targetH - rectH) / 2f;
-            var py = (float)Math.Clamp(asset.PanY, -1, 1);
-            dest = new SKRect(rect.Left, rect.Top - excess + py * excess, rect.Left + targetW, rect.Top - excess + py * excess + targetH);
-        }
+        float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
+        float scale = baseScale * (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
+        var targetW = imgW * scale; var targetH = imgH * scale;
+        var excessX = Math.Max(0, (targetW - rectW) / 2f);
+        var excessY = Math.Max(0, (targetH - rectH) / 2f);
+        var px = (float)Math.Clamp(asset.PanX, -1, 1);
+        var py = (float)Math.Clamp(asset.PanY, -1, 1);
+
+        var left = rect.Left - excessX + px * excessX;
+        var top = rect.Top - excessY + py * excessY;
+        var dest = new SKRect(left, top, left + targetW, top + targetH);
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.DrawBitmap(bmp, dest, paint);
     }
 
-    private static void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project)
+    private static void DrawCoverText(SKCanvas canvas, SKRect bounds, CalendarProject project)
     {
-        var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-        if (asset != null && File.Exists(asset.Path))
-        {
-            using var bmp = SKBitmap.Decode(asset.Path);
-            if (bmp != null)
-            {
-                var imgAspect = (float)bmp.Width / (float)bmp.Height;
-                var rectAspect = bounds.Width / bounds.Height;
-                SKRect dest;
-                if (imgAspect > rectAspect)
-                {
-                    var targetH = bounds.Height; var scale = targetH / bmp.Height; var targetW = (float)bmp.Width * scale; var excess = (targetW - bounds.Width) / 2f;
-                    var px = (float)Math.Clamp(asset.PanX, -1, 1);
-                    dest = new SKRect(bounds.Left - excess + px * excess, bounds.Top, bounds.Left - excess + px * excess + targetW, bounds.Top + targetH);
-                }
-                else
-                {
-                    var targetW = bounds.Width; var scale = targetW / bmp.Width; var targetH = (float)bmp.Height * scale; var excess = (targetH - bounds.Height) / 2f;
-                    var py = (float)Math.Clamp(asset.PanY, -1, 1);
-                    dest = new SKRect(bounds.Left, bounds.Top - excess + py * excess, bounds.Left + targetW, bounds.Top - excess + py * excess + targetH);
-                }
-                using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
-                canvas.DrawBitmap(bmp, dest, paint);
-            }
-        }
-        else
-        {
-            canvas.DrawRect(bounds, new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) });
-        }
-
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
         using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
         var title = project.CoverSpec.TitleText ?? string.Empty;
