@@ -6,9 +6,11 @@
     xmlns:views="clr-namespace:CalendarMaker_MAUI.Views"
     Title="CalendarMaker_MAUI">
 
-    <ShellContent
-        Title="Projects"
-        ContentTemplate="{DataTemplate views:ProjectsPage}"
-        Route="ProjectsPage" />
+    <TabBar>
+        <ShellContent
+            Title="Projects"
+            ContentTemplate="{DataTemplate views:ProjectsPage}"
+            Route="projects" />
+    </TabBar>
 
 </Shell>

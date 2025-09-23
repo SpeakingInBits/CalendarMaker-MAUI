@@ -2,6 +2,7 @@
 using CalendarMaker_MAUI.Services;
 using CalendarMaker_MAUI.ViewModels;
 using CommunityToolkit.Maui;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace CalendarMaker_MAUI
 {
@@ -13,6 +14,7 @@ namespace CalendarMaker_MAUI
             builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
+                .UseSkiaSharp()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -30,12 +32,15 @@ namespace CalendarMaker_MAUI
 
             builder.Services.AddTransient<ProjectsViewModel>();
             builder.Services.AddTransient<Views.ProjectsPage>();
+            builder.Services.AddTransient<Views.DesignerPage>();
 
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
+            var app = builder.Build();
+            AppServices.Services = app.Services;
+            return app;
         }
     }
 }

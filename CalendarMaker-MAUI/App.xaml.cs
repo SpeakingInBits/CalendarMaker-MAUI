@@ -6,8 +6,8 @@
         {
             InitializeComponent();
 
-            // Use a NavigationPage to support PushAsync from ProjectsPage
-            MainPage = new NavigationPage(projectsPage);
+            // Use Shell again for modern navigation
+            MainPage = new AppShell();
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
