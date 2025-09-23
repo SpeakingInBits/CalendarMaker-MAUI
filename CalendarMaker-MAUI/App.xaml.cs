@@ -5,14 +5,15 @@
         public App(Views.ProjectsPage projectsPage)
         {
             InitializeComponent();
-
-            // Use Shell again for modern navigation
-            MainPage = new AppShell();
+            // Root page will be created in CreateWindow
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            return new Window(MainPage);
+            // Initialize the app using Shell and return a Window with the root page
+            var shell = new AppShell();
+            var window = new Window(shell);
+            return window;
         }
     }
 }
