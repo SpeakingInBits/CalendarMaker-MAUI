@@ -15,6 +15,9 @@ public interface IPdfExportService
 
 public sealed class PdfExportService : IPdfExportService
 {
+    // Render target DPI for raster export. Increase for sharper text (larger files).
+    private const float TargetDpi = 300f; // 300 DPI print quality
+
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
         => RenderDocumentAsync(project, new[] { (monthIndex, false) });
 
@@ -38,8 +41,8 @@ public sealed class PdfExportService : IPdfExportService
         float pageHpt = (float)hPtD;
         if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
 
-        // Pre-render bitmaps (PNG bytes) for each requested page
-        var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt)).ToList();
+        // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
+        var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
 
         var doc = Document.Create(container =>
         {
@@ -60,11 +63,18 @@ public sealed class PdfExportService : IPdfExportService
         return Task.FromResult(stream.ToArray());
     }
 
-    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt)
+    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi)
     {
-        using var skSurface = SKSurface.Create(new SKImageInfo((int)pageWpt, (int)pageHpt, SKColorType.Bgra8888, SKAlphaType.Premul));
+        // Points to pixels scale factor
+        float scale = targetDpi / 72f;
+        int widthPx = Math.Max(1, (int)Math.Round(pageWpt * scale));
+        int heightPx = Math.Max(1, (int)Math.Round(pageHpt * scale));
+
+        using var skSurface = SKSurface.Create(new SKImageInfo(widthPx, heightPx, SKColorType.Bgra8888, SKAlphaType.Premul));
         var sk = skSurface.Canvas;
         sk.Clear(SKColors.White);
+        // Draw using page points coordinate system scaled to target DPI
+        sk.Scale(scale);
 
         var m = project.Margins;
         var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
