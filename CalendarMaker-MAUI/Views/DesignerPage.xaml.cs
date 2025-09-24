@@ -21,7 +21,7 @@ public partial class DesignerPage : ContentPage
 
     private int _monthIndex; // 0..11 relative to StartMonth
 
-    // gesture helpers
+    // gesture helpers, used to manage pan/zoom of active image
     private float _pageScale = 1f;
     private float _pageOffsetX, _pageOffsetY;
     private SKRect _lastPhotoRect;
@@ -54,7 +54,7 @@ public partial class DesignerPage : ContentPage
         _canvas.PaintSurface += Canvas_PaintSurface;
         _canvas.EnableTouchEvents = true;
         _canvas.Touch += OnCanvasTouch;
-        _canvas.Loaded += (_, __) => TryHookKeys();
+
         if (CanvasHost != null)
             CanvasHost.Content = _canvas;
 
@@ -176,75 +176,6 @@ public partial class DesignerPage : ContentPage
             await Navigation.PushModalAsync(modal, true);
         }
     }
-
-    private void TryHookKeys()
-    {
-#if WINDOWS
-        try
-        {
-            var fe = _canvas.Handler?.PlatformView as Microsoft.Maui.Platform.ContentPanel;
-            if (fe != null)
-            {
-                fe.IsTabStop = true;
-                fe.KeyDown += OnCanvasKeyDown;
-                // Enable Windows drag & drop directly on the platform view
-                fe.AllowDrop = true;
-                fe.DragOver += OnWinDragOver;
-                fe.Drop += OnWinDropAsync;
-                fe.PointerPressed += OnWinPointerPressed;
-            }
-        }
-        catch { }
-#endif
-    }
-
-#if WINDOWS
-    private void OnWinDragOver(object? sender, Microsoft.UI.Xaml.DragEventArgs e)
-    {
-        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
-        e.Handled = true;
-    }
-
-    private async void OnWinDropAsync(object? sender, Microsoft.UI.Xaml.DragEventArgs e)
-    {
-        try
-        {
-            if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
-            {
-                var items = await e.DataView.GetStorageItemsAsync();
-                var files = items.OfType<Windows.Storage.StorageFile>().ToList();
-                if (files.Any() && _project != null)
-                {
-                    // Import all dropped files to project gallery
-                    foreach (var file in files)
-                    {
-                        if (file.ContentType?.StartsWith("image/") == true)
-                        {
-                            var fileResult = new FileResult(file.Path);
-                            await _assets.ImportProjectPhotoAsync(_project, fileResult);
-                        }
-                    }
-                    _canvas.InvalidateSurface();
-                    e.Handled = true;
-                }
-            }
-        }
-        catch { }
-    }
-
-    private void OnWinPointerPressed(object? sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        try
-        {
-            // Do not change the active slot on pointer press at the platform level.
-            // Slot selection is handled uniformly in OnCanvasTouch to avoid accidental
-            // selection changes due to platform-specific pointer behavior.
-            var fe = sender as Microsoft.Maui.Platform.ContentPanel;
-            var _ = fe; // keep reference to avoid warnings
-        }
-        catch { }
-    }
-#endif
 
     private void PopulateStaticPickers()
     {
