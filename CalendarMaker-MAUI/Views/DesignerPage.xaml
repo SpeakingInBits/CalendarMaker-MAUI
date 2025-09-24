@@ -19,7 +19,6 @@
                     <Switch x:Name="CoverSwitch" Grid.Column="1" />
                 </Grid>
                 <Button Text="Add Photo" x:Name="AddPhotoBtn" />
-                <Button Text="Add Cover Photo" x:Name="AddCoverPhotoBtn" />
                 <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
                 <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
 

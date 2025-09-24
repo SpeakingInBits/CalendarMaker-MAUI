@@ -62,7 +62,6 @@ public partial class DesignerPage : ContentPage
         PrevBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 11) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
         NextBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 1) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
         AddPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
-        AddCoverPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
         ExportBtn.Clicked += OnExportClicked;
         ExportCoverBtn.Clicked += OnExportCoverClicked;
         ExportYearBtn.Clicked += OnExportYearClicked;
