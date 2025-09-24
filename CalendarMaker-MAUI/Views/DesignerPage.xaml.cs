@@ -758,6 +758,10 @@ public partial class DesignerPage : ContentPage
 
     private void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project)
     {
+        // Helper to draw crisp 1-device-pixel lines and snap coordinates
+        float Stroke1px() => 1f / Math.Max(_pageScale, 0.0001f);
+        float Snap(float v) => (float)Math.Round(v * _pageScale) / Math.Max(_pageScale, 0.0001f);
+
         var month = ((project.StartMonth - 1 + _monthIndex) % 12) + 1;
         var year = project.Year + (project.StartMonth - 1 + _monthIndex) / 12;
         var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
@@ -777,7 +781,7 @@ public partial class DesignerPage : ContentPage
         int shift = (int)project.FirstDayOfWeek;
         var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
-        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
+        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = Stroke1px(), IsAntialias = false };
         using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
 
         float colW = dowRect.Width / 7f;
@@ -787,18 +791,42 @@ public partial class DesignerPage : ContentPage
             var t = displayDows[c];
             var tw = textPaint.MeasureText(t);
             canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            canvas.DrawRect(cell, gridPen);
+            // Optional: light separators for header
+            var x0 = Snap(cell.Left);
+            var x1 = Snap(cell.Right);
+            var y0 = Snap(cell.Top);
+            var y1 = Snap(cell.Bottom);
+            canvas.DrawLine(x0, y0, x1, y0, gridPen); // top
+            canvas.DrawLine(x0, y1, x1, y1, gridPen); // bottom
+            canvas.DrawLine(x0, y0, x0, y1, gridPen); // left
+            if (c == 6)
+                canvas.DrawLine(x1, y0, x1, y1, gridPen); // right edge only once
         }
 
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
+        if (rows <= 0)
+        {
+            // Still draw the outer border for the area where days would be
+            var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
+            var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
+            canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
+            return;
+        }
+
         float rowH = weeksArea.Height / rows;
+
+        // Draw day numbers (no per-cell rectangles to avoid double-stroke seams)
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < 7; c++)
             {
-                var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-                canvas.DrawRect(cell, gridPen);
+                var left = weeksArea.Left + c * colW;
+                var top = weeksArea.Top + r * rowH;
+                var right = weeksArea.Left + (c + 1) * colW;
+                var bottom = weeksArea.Top + (r + 1) * rowH;
+                var cell = new SKRect(left, top, right, bottom);
+
                 var date = weeks[r][c];
                 if (date.HasValue && date.Value.Month == month)
                 {
@@ -807,6 +835,28 @@ public partial class DesignerPage : ContentPage
                 }
             }
         }
+
+        // Single-pass grid lines snapped to device pixels
+        var wx0 = Snap(weeksArea.Left);
+        var wx1 = Snap(weeksArea.Right);
+        var wy0 = Snap(weeksArea.Top);
+        var wy1 = Snap(weeksArea.Bottom);
+
+        // Vertical lines (including outer edges)
+        for (int c = 0; c <= 7; c++)
+        {
+            var x = Snap(weeksArea.Left + c * colW);
+            canvas.DrawLine(x, wy0, x, wy1, gridPen);
+        }
+        // Horizontal lines (including outer edges)
+        for (int r = 0; r <= rows; r++)
+        {
+            var y = Snap(weeksArea.Top + r * rowH);
+            canvas.DrawLine(wx0, y, wx1, y, gridPen);
+        }
+
+        // Final outer border reinforcement
+        canvas.DrawRect(new SKRect(wx0, wy0, wx1, wy1), gridPen);
     }
 
     private void OnSplitResetTapped(object? sender, TappedEventArgs e)
