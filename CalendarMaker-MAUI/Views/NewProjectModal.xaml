@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="CalendarMaker_MAUI.Views.NewProjectModal"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="New Project">
+    <VerticalStackLayout Padding="20" Spacing="16">
+        <Label Text="Create New Project" FontAttributes="Bold" FontSize="20" />
+
+        <VerticalStackLayout Spacing="8">
+            <Label Text="Preset" />
+            <Picker x:Name="PresetPicker">
+                <Picker.Items>
+                    <x:String>5x7 Landscape</x:String>
+                    <x:String>Letter Portrait</x:String>
+                </Picker.Items>
+            </Picker>
+        </VerticalStackLayout>
+
+        <VerticalStackLayout Spacing="8">
+            <Label Text="Project Name" />
+            <Entry x:Name="NameEntry" Placeholder="My Calendar" />
+        </VerticalStackLayout>
+
+        <VerticalStackLayout Spacing="8">
+            <Label Text="Calendar Year" />
+            <Entry x:Name="YearEntry" Keyboard="Numeric" />
+        </VerticalStackLayout>
+
+        <HorizontalStackLayout Spacing="12" HorizontalOptions="End">
+            <Button x:Name="CancelBtn" Text="Cancel" />
+            <Button x:Name="CreateBtn" Text="Create" />
+        </HorizontalStackLayout>
+    </VerticalStackLayout>
+</ContentPage>

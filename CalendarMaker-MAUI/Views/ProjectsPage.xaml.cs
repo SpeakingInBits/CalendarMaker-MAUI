@@ -20,20 +20,37 @@ public partial class ProjectsPage : ContentPage
 
     private async Task OnNewProjectClicked()
     {
-        var preset = await this.DisplayActionSheetAsync("Create Project", "Cancel", null,
-            "5x7 Landscape 50/50 (Photo Left)",
-            "Letter Portrait 50/50 (Photo Top)");
-        if (preset is null || preset == "Cancel") return;
+        var modal = new NewProjectModal();
 
-        var name = await this.DisplayPromptAsync("Project Name", "Enter a name:", initialValue: "My Calendar");
-        if (string.IsNullOrWhiteSpace(name)) name = "My Calendar";
-        var yearText = await this.DisplayPromptAsync("Year", "Enter calendar year:", initialValue: DateTime.Now.Year.ToString());
-        var year = DateTime.Now.Year;
-        _ = int.TryParse(yearText, out year);
+        TaskCompletionSource<(string preset, string name, int year)?> tcs = new();
+
+        modal.Cancelled += async (_, __) =>
+        {
+            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+            tcs.TrySetResult(null);
+        };
+        modal.Created += async (_, __) =>
+        {
+            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+            if (modal.SelectedPreset is string p && modal.ProjectName is string n && modal.Year is int y)
+            {
+                tcs.TrySetResult((p, n, y));
+            }
+            else
+            {
+                tcs.TrySetResult(null);
+            }
+        };
+
+        await Shell.Current.Navigation.PushModalAsync(modal);
+        var result = await tcs.Task;
+        if (result is null) return;
+
+        var (preset, name, year) = result.Value;
 
         var project = new CalendarProject
         {
-            Name = name,
+            Name = string.IsNullOrWhiteSpace(name) ? "My Calendar" : name,
             Year = year,
             FirstDayOfWeek = DayOfWeek.Sunday,
             PageSpec = new PageSpec(),
