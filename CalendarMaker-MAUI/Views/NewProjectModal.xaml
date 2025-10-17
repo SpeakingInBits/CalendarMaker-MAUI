@@ -12,6 +12,8 @@
                 <Picker.Items>
                     <x:String>5x7 Landscape</x:String>
                     <x:String>Letter Portrait</x:String>
+                    <x:String>11x17 Portrait</x:String>
+                    <x:String>13x19 Portrait</x:String>
                 </Picker.Items>
             </Picker>
         </VerticalStackLayout>

@@ -65,6 +65,20 @@ public partial class ProjectsPage : ContentPage
             project.PageSpec.Orientation = PageOrientation.Landscape;
             project.LayoutSpec.Placement = LayoutPlacement.PhotoLeftCalendarRight;
         }
+        else if (preset.StartsWith("11x17"))
+        {
+            project.PageSpec.Size = PageSize.Tabloid_11x17;
+            project.PageSpec.Orientation = PageOrientation.Portrait;
+            project.LayoutSpec.Placement = LayoutPlacement.PhotoTopCalendarBottom;
+            project.LayoutSpec.SplitRatio = 0.6;
+        }
+        else if (preset.StartsWith("13x19"))
+        {
+            project.PageSpec.Size = PageSize.SuperB_13x19;
+            project.PageSpec.Orientation = PageOrientation.Portrait;
+            project.LayoutSpec.Placement = LayoutPlacement.PhotoTopCalendarBottom;
+            project.LayoutSpec.SplitRatio = 0.65;
+        }
         else
         {
             project.PageSpec.Size = PageSize.Letter;

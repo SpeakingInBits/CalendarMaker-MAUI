@@ -22,6 +22,16 @@ public sealed class LayoutService : ILayoutService
             project.LayoutSpec.Placement = Models.LayoutPlacement.PhotoTopCalendarBottom;
             project.LayoutSpec.SplitRatio = 0.5;
         }
+        else if (project.PageSpec.Size == Models.PageSize.Tabloid_11x17 && project.PageSpec.Orientation == Models.PageOrientation.Portrait)
+        {
+            project.LayoutSpec.Placement = Models.LayoutPlacement.PhotoTopCalendarBottom;
+            project.LayoutSpec.SplitRatio = 0.6;
+        }
+        else if (project.PageSpec.Size == Models.PageSize.SuperB_13x19 && project.PageSpec.Orientation == Models.PageOrientation.Portrait)
+        {
+            project.LayoutSpec.Placement = Models.LayoutPlacement.PhotoTopCalendarBottom;
+            project.LayoutSpec.SplitRatio = 0.65;
+        }
         else
         {
             // Sensible fallback

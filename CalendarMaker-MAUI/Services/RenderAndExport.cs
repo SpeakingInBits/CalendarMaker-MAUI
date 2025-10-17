@@ -171,6 +171,33 @@ public sealed class PdfExportService : IPdfExportService
                     list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
                     break;
                 }
+            case PhotoLayout.TwoHorizontalStack:
+                {
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Right, area.Top + halfH));
+                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.ThreeLeftStack:
+                {
+                    // 2 photos stacked vertically on left (taking 50% width), 1 photo on right (taking 50% width)
+                    float halfW = (area.Width - gap) / 2f;
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
+                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.ThreeRightStack:
+                {
+                    // 1 photo on left (taking 50% width), 2 photos stacked vertically on right (taking 50% width)
+                    float halfW = (area.Width - gap) / 2f;
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
+                    break;
+                }
             default:
                 list.Add(area);
                 break;
