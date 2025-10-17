@@ -52,6 +52,9 @@
                             <x:String>Single</x:String>
                             <x:String>Two (vertical split)</x:String>
                             <x:String>Grid 2x2 (4)</x:String>
+                            <x:String>Two (stacked)</x:String>
+                            <x:String>Three (2 left, 1 right)</x:String>
+                            <x:String>Three (1 left, 2 right)</x:String>
                         </Picker.Items>
                     </Picker>
                 </Grid>

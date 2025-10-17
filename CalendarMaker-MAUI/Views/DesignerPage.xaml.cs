@@ -194,6 +194,9 @@ public partial class DesignerPage : ContentPage
         {
             1 => PhotoLayout.TwoVerticalSplit,
             2 => PhotoLayout.Grid2x2,
+            3 => PhotoLayout.TwoHorizontalStack,
+            4 => PhotoLayout.ThreeLeftStack,
+            5 => PhotoLayout.ThreeRightStack,
             _ => PhotoLayout.Single
         };
         _project.MonthPhotoLayouts[_monthIndex] = layout;
@@ -221,6 +224,9 @@ public partial class DesignerPage : ContentPage
         {
             PhotoLayout.TwoVerticalSplit => 1,
             PhotoLayout.Grid2x2 => 2,
+            PhotoLayout.TwoHorizontalStack => 3,
+            PhotoLayout.ThreeLeftStack => 4,
+            PhotoLayout.ThreeRightStack => 5,
             _ => 0
         };
         PhotoLayoutPicker.SelectedIndex = idx;
@@ -474,6 +480,33 @@ public partial class DesignerPage : ContentPage
                     list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
                     list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
                     list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.TwoHorizontalStack:
+                {
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Right, area.Top + halfH));
+                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.ThreeLeftStack:
+                {
+                    // 2 photos stacked vertically on left (taking 50% width), 1 photo on right (taking 50% width)
+                    float halfW = (area.Width - gap) / 2f;
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
+                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
+                    break;
+                }
+            case PhotoLayout.ThreeRightStack:
+                {
+                    // 1 photo on left (taking 50% width), 2 photos stacked vertically on right (taking 50% width)
+                    float halfW = (area.Width - gap) / 2f;
+                    float halfH = (area.Height - gap) / 2f;
+                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
+                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
                     list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
                     break;
                 }
