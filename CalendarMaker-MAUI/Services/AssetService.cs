@@ -65,10 +65,10 @@ public sealed class AssetService : IAssetService
     {
         if (project == null) return;
 
-        var asset = project.ImageAssets.FirstOrDefault(a => a.Id == assetId);
-        if (asset == null) return;
+        var sourceAsset = project.ImageAssets.FirstOrDefault(a => a.Id == assetId);
+        if (sourceAsset == null) return;
 
-        // Remove any existing photo in this slot
+        // Remove any existing photo in the target slot (not the source photo)
         if (role == "monthPhoto" && slotIndex.HasValue)
         {
             await RemovePhotoFromSlotAsync(project, monthIndex, slotIndex.Value, role);
@@ -78,18 +78,29 @@ public sealed class AssetService : IAssetService
             var existingCover = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
             if (existingCover != null)
             {
-                existingCover.Role = "unassigned";
-                existingCover.MonthIndex = null;
-                existingCover.SlotIndex = null;
+                // Remove the existing cover photo from the project
+                project.ImageAssets.Remove(existingCover);
             }
         }
 
-        // Assign the photo to the slot
-        asset.Role = role;
-        asset.MonthIndex = role == "coverPhoto" ? null : monthIndex;
-        asset.SlotIndex = role == "coverPhoto" ? null : slotIndex;
-        asset.PanX = asset.PanY = 0;
-        asset.Zoom = 1;
+        // Create a NEW asset instance that references the same file
+        // This allows the same photo to be used in multiple places
+        var newAsset = new ImageAsset
+        {
+            Id = Guid.NewGuid().ToString("N"), // New unique ID
+            ProjectId = project.Id,
+            Path = sourceAsset.Path, // Same file path - reuse the image file
+            Role = role,
+            MonthIndex = role == "coverPhoto" ? null : monthIndex,
+            SlotIndex = role == "coverPhoto" ? null : slotIndex,
+            PanX = 0,
+            PanY = 0,
+            Zoom = 1,
+            Order = 0
+        };
+
+        // Add the new asset to the project
+        project.ImageAssets.Add(newAsset);
 
         await _storage.UpdateProjectAsync(project);
     }
@@ -105,11 +116,9 @@ public sealed class AssetService : IAssetService
 
         if (asset != null)
         {
-            asset.Role = "unassigned";
-            asset.MonthIndex = null;
-            asset.SlotIndex = null;
-            asset.PanX = asset.PanY = 0;
-            asset.Zoom = 1;
+            // Remove the asset instance from the project
+            // The original "unassigned" photo remains available for reuse
+            project.ImageAssets.Remove(asset);
             await _storage.UpdateProjectAsync(project);
         }
     }
@@ -124,6 +133,7 @@ public sealed class AssetService : IAssetService
 
     public async Task<IReadOnlyList<ImageAsset>> GetAllPhotosAsync(CalendarProject project)
     {
+        // Return ALL assets - the modal will handle grouping and deduplication
         return await Task.FromResult(project.ImageAssets.ToList());
     }
 }

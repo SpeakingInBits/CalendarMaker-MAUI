@@ -41,17 +41,28 @@ public partial class PhotoSelectorModal : ContentPage
     {
         _photos.Clear();
         
-        // Sort: unassigned first, then by filename
-        var sortedPhotos = allPhotos
-            .Select(asset => new PhotoItem
+        // Group by path to determine if unassigned version exists and if photo is in use
+        var photosByPath = allPhotos.GroupBy(a => a.Path).ToList();
+        
+        // Sort: not in use first, then by filename
+        var sortedPhotos = photosByPath
+            .Select(group => 
             {
-                Asset = asset,
-                Path = asset.Path,
-                FileName = System.IO.Path.GetFileName(asset.Path),
-                IsUnassigned = asset.Role == "unassigned",
-                IsSelected = false
+                var representative = group.First();
+                var hasUnassigned = group.Any(a => a.Role == "unassigned");
+                var isInUse = group.Any(a => a.Role != "unassigned");
+                
+                return new PhotoItem
+                {
+                    Asset = representative,
+                    Path = representative.Path,
+                    FileName = System.IO.Path.GetFileName(representative.Path),
+                    IsUnassigned = hasUnassigned,
+                    IsInUse = isInUse,
+                    IsSelected = false
+                };
             })
-            .OrderByDescending(p => p.IsUnassigned) // Unassigned first (true > false)
+            .OrderBy(p => p.IsInUse) // Not in use first (false < true)
             .ThenBy(p => p.FileName) // Then alphabetically by filename
             .ToList();
         
@@ -127,6 +138,7 @@ public class PhotoItem : INotifyPropertyChanged
     public string? Path { get; set; }
     public string? FileName { get; set; }
     public bool IsUnassigned { get; set; }
+    public bool IsInUse { get; set; }
     
     public bool IsSelected
     {

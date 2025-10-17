@@ -2,12 +2,8 @@
 <ContentPage x:Class="CalendarMaker_MAUI.Views.PhotoSelectorModal"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Select Photo"
              BackgroundColor="Black">
-    <ContentPage.Resources>
-        <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
-    </ContentPage.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="60" />
@@ -97,17 +93,17 @@
                                            HorizontalOptions="Fill" />
                                 </Border>
                                 
-                                <!-- "ASSIGNED" badge for already-used photos -->
+                                <!-- "IN USE" badge for photos already in calendar -->
                                 <Border HorizontalOptions="End" 
                                         VerticalOptions="Start"
                                         BackgroundColor="#FFAA3333"
                                         Padding="6,2"
                                         Margin="4"
-                                        IsVisible="{Binding IsUnassigned, Converter={StaticResource InvertedBoolConverter}}">
+                                        IsVisible="{Binding IsInUse}">
                                     <Border.StrokeShape>
                                         <RoundRectangle CornerRadius="4" />
                                     </Border.StrokeShape>
-                                    <Label Text="ASSIGNED" 
+                                    <Label Text="IN USE" 
                                            TextColor="White"
                                            FontSize="9"
                                            FontAttributes="Bold" />
