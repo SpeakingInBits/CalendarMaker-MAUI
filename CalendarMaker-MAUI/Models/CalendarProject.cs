@@ -23,4 +23,14 @@ public sealed class CalendarProject
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+
+    // Computed property for display
+    public string PageSizeDisplay => PageSpec.Size switch
+    {
+        PageSize.FiveBySeven => "5x7",
+        PageSize.Letter => "Letter",
+        PageSize.Tabloid_11x17 => "11x17",
+        PageSize.SuperB_13x19 => "13x19",
+        _ => PageSpec.Size.ToString()
+    };
 }
