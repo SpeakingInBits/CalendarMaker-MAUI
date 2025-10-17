@@ -6,11 +6,19 @@ using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using SkiaSharp;
 
+public class ExportProgress
+{
+    public int CurrentPage { get; set; }
+    public int TotalPages { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public bool CanCancel { get; set; } = true;
+}
+
 public interface IPdfExportService
 {
     Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex);
     Task<byte[]> ExportCoverAsync(CalendarProject project);
-    Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true);
+    Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default);
 }
 
 public sealed class PdfExportService : IPdfExportService
@@ -18,20 +26,20 @@ public sealed class PdfExportService : IPdfExportService
     private const float TargetDpi = 300f; // 300 DPI print quality
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
-        => RenderDocumentAsync(project, new[] { (monthIndex, false) });
+        => RenderDocumentAsync(project, new[] { (monthIndex, false) }, null, default);
 
     public Task<byte[]> ExportCoverAsync(CalendarProject project)
-        => RenderDocumentAsync(project, new[] { (0, true) });
+        => RenderDocumentAsync(project, new[] { (0, true) }, null, default);
 
-    public Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true)
+    public Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         var pages = new List<(int idx, bool cover)>();
         if (includeCover) pages.Add((0, true));
         for (int i = 0; i < 12; i++) pages.Add((i, false));
-        return RenderDocumentAsync(project, pages);
+        return RenderDocumentAsync(project, pages, progress, cancellationToken);
     }
 
-    private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages)
+    private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages, IProgress<ExportProgress>? progress, CancellationToken cancellationToken)
     {
         return Task.Run(() =>
         {
@@ -42,30 +50,82 @@ public sealed class PdfExportService : IPdfExportService
             float pageHpt = (float)hPtD;
             if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
 
-            // Pre-render bitmaps (PNG bytes) at high DPI for each requested page
-            var rendered = pages.Select(p => RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi)).ToList();
+            var pagesList = pages.ToList();
+            var totalPages = pagesList.Count;
 
-            var doc = Document.Create(container =>
+            // Image cache to avoid re-decoding same images
+            var imageCache = new Dictionary<string, SKBitmap>();
+            
+            try
             {
-                foreach (var img in rendered)
+                // Stream processing: render pages one at a time and add to document
+                var doc = Document.Create(container =>
                 {
-                    container.Page(page =>
+                    int currentPage = 0;
+                    foreach (var p in pagesList)
                     {
-                        page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
-                        page.Margin(0);
-                        page.DefaultTextStyle(x => x.FontSize(12));
-                        page.Content().Image(img).FitArea();
-                    });
-                }
-            });
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
+                        currentPage++;
+                        
+                        // Report progress
+                        if (progress != null)
+                        {
+                            var month = p.cover ? "Cover" : new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                            progress.Report(new ExportProgress 
+                            { 
+                                CurrentPage = currentPage, 
+                                TotalPages = totalPages, 
+                                Status = $"Rendering {month}..."
+                            });
+                        }
 
-            using var stream = new MemoryStream();
-            doc.GeneratePdf(stream);
-            return stream.ToArray();
-        });
+                        var imgBytes = RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi, imageCache);
+                        
+                        container.Page(page =>
+                        {
+                            page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
+                            page.Margin(0);
+                            page.DefaultTextStyle(x => x.FontSize(12));
+                            page.Content().Image(imgBytes).FitArea();
+                        });
+                    }
+                });
+
+                // Final progress update - before PDF generation
+                progress?.Report(new ExportProgress 
+                { 
+                    CurrentPage = totalPages, 
+                    TotalPages = totalPages, 
+                    Status = "Generating PDF file..."
+                });
+
+                using var stream = new MemoryStream();
+                doc.GeneratePdf(stream);
+                
+                // Update after PDF generation complete
+                progress?.Report(new ExportProgress 
+                { 
+                    CurrentPage = totalPages, 
+                    TotalPages = totalPages, 
+                    Status = "Export complete!"
+                });
+                
+                return stream.ToArray();
+            }
+            finally
+            {
+                // Clean up cached bitmaps
+                foreach (var bmp in imageCache.Values)
+                {
+                    bmp?.Dispose();
+                }
+                imageCache.Clear();
+            }
+        }, cancellationToken);
     }
 
-    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi)
+    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi, Dictionary<string, SKBitmap>? imageCache = null)
     {
         // Points to pixels scale factor
         float scale = targetDpi / 72f;
@@ -88,7 +148,7 @@ public sealed class PdfExportService : IPdfExportService
             var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
             if (asset != null && File.Exists(asset.Path))
             {
-                using var bmp = SKBitmap.Decode(asset.Path);
+                var bmp = GetOrLoadBitmap(asset.Path, imageCache);
                 if (bmp != null)
                     DrawBitmapWithPanZoom(sk, bmp, contentRect, asset);
             }
@@ -112,7 +172,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault();
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    using var bmp = SKBitmap.Decode(asset.Path);
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
                     if (bmp != null)
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
                 }
@@ -123,8 +183,31 @@ public sealed class PdfExportService : IPdfExportService
 
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
-        using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
+        // Use JPEG with 85% quality - much faster encoding than PNG
+        // and adequate for intermediate format before PDF embedding
+        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 85);
         return data.ToArray();
+    }
+
+    private static SKBitmap? GetOrLoadBitmap(string path, Dictionary<string, SKBitmap>? cache)
+    {
+        if (cache == null)
+        {
+            // No caching, decode on demand
+            return SKBitmap.Decode(path);
+        }
+
+        if (cache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var bitmap = SKBitmap.Decode(path);
+        if (bitmap != null)
+        {
+            cache[path] = bitmap;
+        }
+        return bitmap;
     }
 
     private static (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
