@@ -13,7 +13,7 @@ public partial class PhotoSelectorModal : ContentPage
     public event EventHandler? RemoveRequested;
     public event EventHandler? Cancelled;
 
-    public PhotoSelectorModal(IEnumerable<ImageAsset> unassignedPhotos, string slotDescription)
+    public PhotoSelectorModal(IEnumerable<ImageAsset> allPhotos, string slotDescription)
     {
         InitializeComponent();
         
@@ -31,24 +31,33 @@ public partial class PhotoSelectorModal : ContentPage
         AssignBtn.Clicked += OnAssignClicked;
 
         // Load photos
-        LoadPhotos(unassignedPhotos);
+        LoadPhotos(allPhotos);
         
         // Update status
         UpdateStatus();
     }
 
-    private void LoadPhotos(IEnumerable<ImageAsset> unassignedPhotos)
+    private void LoadPhotos(IEnumerable<ImageAsset> allPhotos)
     {
         _photos.Clear();
         
-        foreach (var asset in unassignedPhotos.OrderBy(a => a.Id))
-        {
-            _photos.Add(new PhotoItem
+        // Sort: unassigned first, then by filename
+        var sortedPhotos = allPhotos
+            .Select(asset => new PhotoItem
             {
                 Asset = asset,
                 Path = asset.Path,
+                FileName = System.IO.Path.GetFileName(asset.Path),
+                IsUnassigned = asset.Role == "unassigned",
                 IsSelected = false
-            });
+            })
+            .OrderByDescending(p => p.IsUnassigned) // Unassigned first (true > false)
+            .ThenBy(p => p.FileName) // Then alphabetically by filename
+            .ToList();
+        
+        foreach (var photo in sortedPhotos)
+        {
+            _photos.Add(photo);
         }
 
         if (!_photos.Any())
@@ -116,6 +125,8 @@ public class PhotoItem : INotifyPropertyChanged
     
     public ImageAsset? Asset { get; set; }
     public string? Path { get; set; }
+    public string? FileName { get; set; }
+    public bool IsUnassigned { get; set; }
     
     public bool IsSelected
     {

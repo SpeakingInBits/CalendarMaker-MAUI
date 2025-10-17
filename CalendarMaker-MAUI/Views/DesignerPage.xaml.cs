@@ -106,8 +106,8 @@ public partial class DesignerPage : ContentPage
     {
         if (_project == null) return;
 
-        // Always open the modal, even if there are no unassigned photos yet.
-        var unassignedPhotos = await _assets.GetUnassignedPhotosAsync(_project);
+        // Get all photos to show both unassigned and assigned
+        var allPhotos = await _assets.GetAllPhotosAsync(_project);
 
         string slotDescription;
         if (CoverSwitch.IsToggled)
@@ -122,7 +122,7 @@ public partial class DesignerPage : ContentPage
             slotDescription = $"{monthName} - Slot {_activeSlotIndex + 1}";
         }
 
-        var modal = new PhotoSelectorModal(unassignedPhotos, slotDescription);
+        var modal = new PhotoSelectorModal(allPhotos, slotDescription);
 
         // Assign selected photo to the active target
         modal.PhotoSelected += async (_, args) =>

@@ -2,8 +2,12 @@
 <ContentPage x:Class="CalendarMaker_MAUI.Views.PhotoSelectorModal"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Select Photo"
              BackgroundColor="Black">
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+    </ContentPage.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="60" />
@@ -77,7 +81,39 @@
                                        Aspect="AspectFill"
                                        HeightRequest="120"
                                        WidthRequest="120" />
-                                <!-- Overlay for selection -->
+                                       
+                                <!-- Filename label at bottom with semi-transparent background -->
+                                <Border VerticalOptions="End" 
+                                        BackgroundColor="#CC000000"
+                                        Padding="4,2">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="0,0,6,6" />
+                                    </Border.StrokeShape>
+                                    <Label Text="{Binding FileName}" 
+                                           TextColor="White"
+                                           FontSize="10"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="1"
+                                           HorizontalOptions="Fill" />
+                                </Border>
+                                
+                                <!-- "ASSIGNED" badge for already-used photos -->
+                                <Border HorizontalOptions="End" 
+                                        VerticalOptions="Start"
+                                        BackgroundColor="#FFAA3333"
+                                        Padding="6,2"
+                                        Margin="4"
+                                        IsVisible="{Binding IsUnassigned, Converter={StaticResource InvertedBoolConverter}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="4" />
+                                    </Border.StrokeShape>
+                                    <Label Text="ASSIGNED" 
+                                           TextColor="White"
+                                           FontSize="9"
+                                           FontAttributes="Bold" />
+                                </Border>
+                                
+                                <!-- Selection overlay -->
                                 <Border BackgroundColor="#33007ACC">
                                     <Border.StrokeShape>
                                         <RoundRectangle CornerRadius="8" />
@@ -85,9 +121,9 @@
                                     <Border.IsVisible>
                                         <Binding Path="IsSelected" />
                                     </Border.IsVisible>
-                                    <Label Text="?" 
+                                    <Label Text="✓" 
                                            TextColor="White"
-                                           FontSize="24"
+                                           FontSize="32"
                                            FontAttributes="Bold"
                                            HorizontalOptions="Center"
                                            VerticalOptions="Center" />

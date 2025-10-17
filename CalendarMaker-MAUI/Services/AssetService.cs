@@ -10,6 +10,7 @@ public interface IAssetService
     Task RemovePhotoFromSlotAsync(CalendarProject project, int monthIndex, int slotIndex, string role = "monthPhoto");
     string GetImagesDirectory(string projectId);
     Task<IReadOnlyList<ImageAsset>> GetUnassignedPhotosAsync(CalendarProject project);
+    Task<IReadOnlyList<ImageAsset>> GetAllPhotosAsync(CalendarProject project);
 }
 
 public sealed class AssetService : IAssetService
@@ -119,5 +120,10 @@ public sealed class AssetService : IAssetService
             .Where(a => a.Role == "unassigned")
             .OrderBy(a => a.Id)
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<ImageAsset>> GetAllPhotosAsync(CalendarProject project)
+    {
+        return await Task.FromResult(project.ImageAssets.ToList());
     }
 }
