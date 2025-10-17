@@ -14,13 +14,13 @@
                     <Button Text="Next" x:Name="NextBtn" />
                 </HorizontalStackLayout>
 
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" >
-                    <Label Text="Cover Page" VerticalTextAlignment="Center" />
-                    <Switch x:Name="CoverSwitch" Grid.Column="1" />
-                </Grid>
                 <Button Text="Add Photo" x:Name="AddPhotoBtn" />
-                <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
-                <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
+                
+                <!-- Cover/Back Cover specific controls -->
+                <StackLayout x:Name="CoverControls" IsVisible="False" Spacing="4">
+                    <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
+                    <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
+                </StackLayout>
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Layout" FontAttributes="Bold" />
