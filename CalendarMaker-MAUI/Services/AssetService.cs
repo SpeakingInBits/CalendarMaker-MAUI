@@ -73,12 +73,14 @@ public sealed class AssetService : IAssetService
         {
             await RemovePhotoFromSlotAsync(project, monthIndex, slotIndex.Value, role);
         }
-        else if (role == "coverPhoto")
+        else if (role == "coverPhoto" || role == "backCoverPhoto")
         {
-            var existingCover = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
+            // Remove existing photo from THIS SPECIFIC SLOT on the cover
+            var existingCover = project.ImageAssets.FirstOrDefault(a => 
+                a.Role == role && 
+                (a.SlotIndex ?? 0) == (slotIndex ?? 0));
             if (existingCover != null)
             {
-                // Remove the existing cover photo from the project
                 project.ImageAssets.Remove(existingCover);
             }
         }
@@ -91,8 +93,8 @@ public sealed class AssetService : IAssetService
             ProjectId = project.Id,
             Path = sourceAsset.Path, // Same file path - reuse the image file
             Role = role,
-            MonthIndex = role == "coverPhoto" ? null : monthIndex,
-            SlotIndex = role == "coverPhoto" ? null : slotIndex,
+            MonthIndex = (role == "coverPhoto" || role == "backCoverPhoto") ? null : monthIndex,
+            SlotIndex = slotIndex, // Keep the slot index for ALL roles (including covers!)
             PanX = 0,
             PanY = 0,
             Zoom = 1,

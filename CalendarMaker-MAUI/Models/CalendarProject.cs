@@ -20,6 +20,10 @@ public sealed class CalendarProject
 
     // Optional per-month photo layout override (0..11 month index relative to StartMonth)
     public Dictionary<int, PhotoLayout> MonthPhotoLayouts { get; set; } = new();
+    
+    // Photo layouts for covers
+    public PhotoLayout FrontCoverPhotoLayout { get; set; } = PhotoLayout.Single;
+    public PhotoLayout BackCoverPhotoLayout { get; set; } = PhotoLayout.Single;
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;

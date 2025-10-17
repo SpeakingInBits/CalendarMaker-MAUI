@@ -212,30 +212,42 @@ public sealed class PdfExportService : IPdfExportService
 
         if (renderCover)
         {
-            // Front cover
-            sk.Save(); sk.ClipRect(contentRect, antialias: true);
-            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-            if (asset != null && File.Exists(asset.Path))
+            // Front cover - support multiple photo slots
+            var layout = project.FrontCoverPhotoLayout;
+            var slots = ComputePhotoSlots(contentRect, layout);
+            foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
-                var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-                if (bmp != null)
-                    DrawBitmapWithPanZoom(sk, bmp, contentRect, asset);
+                sk.Save(); sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets
+                    .FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
             }
-            sk.Restore();
             DrawCoverText(sk, contentRect, project, true);
         }
         else if (renderBackCover)
         {
-            // Back cover
-            sk.Save(); sk.ClipRect(contentRect, antialias: true);
-            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto");
-            if (asset != null && File.Exists(asset.Path))
+            // Back cover - support multiple photo slots
+            var layout = project.BackCoverPhotoLayout;
+            var slots = ComputePhotoSlots(contentRect, layout);
+            foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
-                var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-                if (bmp != null)
-                    DrawBitmapWithPanZoom(sk, bmp, contentRect, asset);
+                sk.Save(); sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets
+                    .FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
             }
-            sk.Restore();
             DrawCoverText(sk, contentRect, project, false);
         }
         else
