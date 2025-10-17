@@ -41,7 +41,7 @@ public sealed class PdfExportService : IPdfExportService
 
     private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages, IProgress<ExportProgress>? progress, CancellationToken cancellationToken)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -65,10 +65,13 @@ public sealed class PdfExportService : IPdfExportService
                 // Parallel rendering of all pages
                 var renderedPages = new byte[totalPages][];
                 
+                // Optimize parallel degree for mobile devices
+                int maxParallelism = GetOptimalParallelism();
+                
                 Parallel.For(0, totalPages, new ParallelOptions 
                 { 
                     CancellationToken = cancellationToken,
-                    MaxDegreeOfParallelism = Environment.ProcessorCount // Use all available cores
+                    MaxDegreeOfParallelism = maxParallelism
                 }, 
                 pageIndex =>
                 {
@@ -111,7 +114,7 @@ public sealed class PdfExportService : IPdfExportService
                 // Small delay to ensure UI sees the status update
                 if (progress != null)
                 {
-                    Thread.Sleep(100);
+                    await Task.Delay(100, cancellationToken);
                 }
 
                 // All pages rendered, now create PDF document
@@ -144,7 +147,7 @@ public sealed class PdfExportService : IPdfExportService
                 // Small delay to ensure the "Generating PDF file..." message is visible
                 if (progress != null)
                 {
-                    Thread.Sleep(50);
+                    await Task.Delay(50, cancellationToken);
                 }
                 
                 // Update after PDF generation complete
@@ -167,6 +170,21 @@ public sealed class PdfExportService : IPdfExportService
                 imageCache.Clear();
             }
         }, cancellationToken);
+    }
+
+    private static int GetOptimalParallelism()
+    {
+        // Detect platform and optimize accordingly
+        int cores = Environment.ProcessorCount;
+        
+#if ANDROID || IOS
+        // On mobile devices, use fewer threads to prevent overheating and battery drain
+        // Also helps with memory pressure on constrained devices
+        return Math.Min(cores, 4); // Cap at 4 threads on mobile
+#else
+        // On desktop, use all available cores
+        return cores;
+#endif
     }
 
     private byte[] RenderPageToJpeg(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
