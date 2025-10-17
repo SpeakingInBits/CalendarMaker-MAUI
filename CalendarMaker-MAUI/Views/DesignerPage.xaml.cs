@@ -73,6 +73,7 @@ public partial class DesignerPage : ContentPage
         FlipBtn.Clicked += (_, __) => FlipLayout();
         SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         ZoomSlider.ValueChanged += (_, e) => { ZoomValueLabel.Text = $"{e.NewValue:F2}x"; UpdateAssetZoom(e.NewValue); };
+        YearEntry.TextChanged += OnYearChanged;
         StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _monthIndex = 0; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         FirstDowPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.FirstDayOfWeek = (DayOfWeek)FirstDowPicker.SelectedIndex; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
 
@@ -273,6 +274,18 @@ public partial class DesignerPage : ContentPage
         _canvas.InvalidateSurface();
     }
 
+    private void OnYearChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_project == null) return;
+        if (int.TryParse(e.NewTextValue, out var year) && year >= 1900 && year <= 2100)
+        {
+            _project.Year = year;
+            UpdateMonthLabel();
+            _ = _storage.UpdateProjectAsync(_project);
+            _canvas.InvalidateSurface();
+        }
+    }
+
     private async Task WithBusyButtonAsync(Button? btn, Func<Task> action, string busyText = "Exporting…")
     {
         if (btn == null)
@@ -329,7 +342,7 @@ public partial class DesignerPage : ContentPage
         var progressModal = new ExportProgressModal();
         progressModal.SetCancellationTokenSource(cts);
         
-        var progress = new Progress<ExportProgress>(p => progressModal.UpdateProgress(p));
+        var progress = new Progress<Services.ExportProgress>(p => progressModal.UpdateProgress(p));
 
         bool exportCompleted = false;
         byte[]? exportedBytes = null;
@@ -407,6 +420,7 @@ public partial class DesignerPage : ContentPage
             SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
             SplitSlider.Value = _project.LayoutSpec.SplitRatio;
             SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
+            YearEntry.Text = _project.Year.ToString();
             StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
             FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
             _activeSlotIndex = 0;
