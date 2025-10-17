@@ -53,35 +53,73 @@ public sealed class PdfExportService : IPdfExportService
             var pagesList = pages.ToList();
             var totalPages = pagesList.Count;
 
-            // Image cache to avoid re-decoding same images
-            var imageCache = new Dictionary<string, SKBitmap>();
+            // Image cache to avoid re-decoding same images - use concurrent dictionary for thread safety
+            var imageCache = new System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>();
+            
+            // Thread-safe counter for progress reporting
+            int completedPages = 0;
+            var progressLock = new object();
             
             try
             {
-                // Stream processing: render pages one at a time and add to document
+                // Parallel rendering of all pages
+                var renderedPages = new byte[totalPages][];
+                
+                Parallel.For(0, totalPages, new ParallelOptions 
+                { 
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = Environment.ProcessorCount // Use all available cores
+                }, 
+                pageIndex =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    var p = pagesList[pageIndex];
+                    
+                    // Render page to JPEG bytes
+                    renderedPages[pageIndex] = RenderPageToJpeg(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi, imageCache);
+                    
+                    // Update progress in thread-safe manner
+                    int currentCompleted;
+                    lock (progressLock)
+                    {
+                        completedPages++;
+                        currentCompleted = completedPages;
+                    }
+                    
+                    // Report progress
+                    if (progress != null)
+                    {
+                        var month = p.cover ? "Cover" : new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                        progress.Report(new ExportProgress 
+                        { 
+                            CurrentPage = currentCompleted, 
+                            TotalPages = totalPages, 
+                            Status = $"Rendering {month}... ({currentCompleted}/{totalPages})"
+                        });
+                    }
+                });
+
+                // All pages rendered - ensure final rendering progress is shown
+                progress?.Report(new ExportProgress 
+                { 
+                    CurrentPage = totalPages, 
+                    TotalPages = totalPages, 
+                    Status = "All pages rendered, creating PDF..."
+                });
+
+                // Small delay to ensure UI sees the status update
+                if (progress != null)
+                {
+                    Thread.Sleep(100);
+                }
+
+                // All pages rendered, now create PDF document
                 var doc = Document.Create(container =>
                 {
-                    int currentPage = 0;
-                    foreach (var p in pagesList)
+                    for (int i = 0; i < totalPages; i++)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        
-                        currentPage++;
-                        
-                        // Report progress
-                        if (progress != null)
-                        {
-                            var month = p.cover ? "Cover" : new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
-                            progress.Report(new ExportProgress 
-                            { 
-                                CurrentPage = currentPage, 
-                                TotalPages = totalPages, 
-                                Status = $"Rendering {month}..."
-                            });
-                        }
-
-                        var imgBytes = RenderPageToPng(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi, imageCache);
-                        
+                        var imgBytes = renderedPages[i];
                         container.Page(page =>
                         {
                             page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
@@ -102,6 +140,12 @@ public sealed class PdfExportService : IPdfExportService
 
                 using var stream = new MemoryStream();
                 doc.GeneratePdf(stream);
+                
+                // Small delay to ensure the "Generating PDF file..." message is visible
+                if (progress != null)
+                {
+                    Thread.Sleep(50);
+                }
                 
                 // Update after PDF generation complete
                 progress?.Report(new ExportProgress 
@@ -125,7 +169,7 @@ public sealed class PdfExportService : IPdfExportService
         }, cancellationToken);
     }
 
-    private byte[] RenderPageToPng(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi, Dictionary<string, SKBitmap>? imageCache = null)
+    private byte[] RenderPageToJpeg(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
     {
         // Points to pixels scale factor
         float scale = targetDpi / 72f;
@@ -189,7 +233,7 @@ public sealed class PdfExportService : IPdfExportService
         return data.ToArray();
     }
 
-    private static SKBitmap? GetOrLoadBitmap(string path, Dictionary<string, SKBitmap>? cache)
+    private static SKBitmap? GetOrLoadBitmap(string path, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? cache)
     {
         if (cache == null)
         {
@@ -197,17 +241,8 @@ public sealed class PdfExportService : IPdfExportService
             return SKBitmap.Decode(path);
         }
 
-        if (cache.TryGetValue(path, out var cached))
-        {
-            return cached;
-        }
-
-        var bitmap = SKBitmap.Decode(path);
-        if (bitmap != null)
-        {
-            cache[path] = bitmap;
-        }
-        return bitmap;
+        // Thread-safe get-or-add
+        return cache.GetOrAdd(path, p => SKBitmap.Decode(p));
     }
 
     private static (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
