@@ -15,12 +15,6 @@
                 </HorizontalStackLayout>
 
                 <Button Text="Add Photo" x:Name="AddPhotoBtn" />
-                
-                <!-- Cover/Back Cover specific controls -->
-                <StackLayout x:Name="CoverControls" IsVisible="False" Spacing="4">
-                    <Entry x:Name="TitleEntry" Placeholder="Cover Title" />
-                    <Entry x:Name="SubtitleEntry" Placeholder="Cover Subtitle" />
-                </StackLayout>
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Layout" FontAttributes="Bold" />

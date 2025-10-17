@@ -228,7 +228,6 @@ public sealed class PdfExportService : IPdfExportService
                 }
                 sk.Restore();
             }
-            DrawCoverText(sk, contentRect, project, true);
         }
         else if (renderBackCover)
         {
@@ -248,7 +247,6 @@ public sealed class PdfExportService : IPdfExportService
                 }
                 sk.Restore();
             }
-            DrawCoverText(sk, contentRect, project, false);
         }
         else
         {
@@ -397,27 +395,6 @@ public sealed class PdfExportService : IPdfExportService
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.DrawBitmap(bmp, dest, paint);
-    }
-
-    private static void DrawCoverText(SKCanvas canvas, SKRect bounds, CalendarProject project, bool isFrontCover)
-    {
-        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
-        using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
-        
-        var title = isFrontCover ? (project.CoverSpec.TitleText ?? string.Empty) : (project.CoverSpec.BackCoverTitle ?? string.Empty);
-        var subtitle = isFrontCover ? (project.CoverSpec.SubtitleText ?? string.Empty) : (project.CoverSpec.BackCoverSubtitle ?? string.Empty);
-        
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            var tw = titlePaint.MeasureText(title);
-            canvas.DrawText(title, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
-        }
-        
-        if (!string.IsNullOrWhiteSpace(subtitle))
-        {
-            var sw = subtitlePaint.MeasureText(subtitle);
-            canvas.DrawText(subtitle, bounds.MidX - sw / 2, bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize, subtitlePaint);
-        }
     }
 
     private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex)

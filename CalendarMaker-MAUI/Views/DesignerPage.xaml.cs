@@ -66,9 +66,6 @@ public partial class DesignerPage : ContentPage
         ExportCoverBtn.Clicked += OnExportCoverClicked;
         ExportYearBtn.Clicked += OnExportYearClicked;
 
-        TitleEntry.TextChanged += (_, __) => { if (_project != null) { UpdateCoverText(); } };
-        SubtitleEntry.TextChanged += (_, __) => { if (_project != null) { UpdateCoverText(); } };
-
         FlipBtn.Clicked += (_, __) => FlipLayout();
         SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         ZoomSlider.ValueChanged += (_, e) => { ZoomValueLabel.Text = $"{e.NewValue:F2}x"; UpdateAssetZoom(e.NewValue); };
@@ -90,26 +87,6 @@ public partial class DesignerPage : ContentPage
         _activeSlotIndex = 0;
         SyncZoomUI();
         UpdatePageLabel();
-        _canvas.InvalidateSurface();
-    }
-
-    private void UpdateCoverText()
-    {
-        if (_project == null) return;
-        
-        // Update the appropriate cover based on current page
-        if (_pageIndex == -1) // Front cover
-        {
-            _project.CoverSpec.TitleText = TitleEntry.Text;
-            _project.CoverSpec.SubtitleText = SubtitleEntry.Text;
-        }
-        else if (_pageIndex == 12) // Back cover
-        {
-            _project.CoverSpec.BackCoverTitle = TitleEntry.Text;
-            _project.CoverSpec.BackCoverSubtitle = SubtitleEntry.Text;
-        }
-        
-        _ = _storage.UpdateProjectAsync(_project);
         _canvas.InvalidateSurface();
     }
 
@@ -287,22 +264,14 @@ public partial class DesignerPage : ContentPage
     {
         if (_project == null) { MonthLabel.Text = string.Empty; return; }
         
-        // Update UI visibility based on page type
-        bool isCoverPage = (_pageIndex == -1 || _pageIndex == 12);
-        CoverControls.IsVisible = isCoverPage;
-        
         if (_pageIndex == -1)
         {
             MonthLabel.Text = "Front Cover";
-            TitleEntry.Text = _project.CoverSpec.TitleText;
-            SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
             SyncPhotoLayoutPicker();
         }
         else if (_pageIndex == 12)
         {
             MonthLabel.Text = "Back Cover";
-            TitleEntry.Text = _project.CoverSpec.BackCoverTitle;
-            SubtitleEntry.Text = _project.CoverSpec.BackCoverSubtitle;
             SyncPhotoLayoutPicker();
         }
         else
@@ -810,28 +779,6 @@ public partial class DesignerPage : ContentPage
             {
                 using var hi = new SKPaint { Color = SKColors.DeepSkyBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 2f };
                 canvas.DrawRect(rect, hi);
-            }
-        }
-
-        var titleText = isFrontCover ? project.CoverSpec.TitleText : project.CoverSpec.BackCoverTitle;
-        var subtitleText = isFrontCover ? project.CoverSpec.SubtitleText : project.CoverSpec.BackCoverSubtitle;
-        
-        if (!string.IsNullOrWhiteSpace(titleText) || !string.IsNullOrWhiteSpace(subtitleText))
-        {
-            using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.CoverSpec.TitleFontSizePt, IsAntialias = true };
-            using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.CoverSpec.SubtitleFontSizePt, IsAntialias = true };
-            
-            if (!string.IsNullOrWhiteSpace(titleText))
-            {
-                var tw = titlePaint.MeasureText(titleText);
-                canvas.DrawText(titleText, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
-            }
-            
-            if (!string.IsNullOrWhiteSpace(subtitleText))
-            {
-                var sw = subtitlePaint.MeasureText(subtitleText);
-                var yOffset = bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize;
-                canvas.DrawText(subtitleText, bounds.MidX - sw / 2, yOffset, subtitlePaint);
             }
         }
     }
