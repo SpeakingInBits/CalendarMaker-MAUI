@@ -323,13 +323,66 @@ public partial class DesignerPage : ContentPage
 
     private async void OnExportYearClicked(object? sender, EventArgs e)
     {
-        await WithBusyButtonAsync(sender as Button, async () =>
+        if (_project == null) return;
+
+        var cts = new CancellationTokenSource();
+        var progressModal = new ExportProgressModal();
+        progressModal.SetCancellationTokenSource(cts);
+        
+        var progress = new Progress<ExportProgress>(p => progressModal.UpdateProgress(p));
+
+        bool exportCompleted = false;
+        byte[]? exportedBytes = null;
+        Exception? exportException = null;
+
+        // Handle cancellation
+        progressModal.Cancelled += async (_, __) =>
         {
-            if (_project == null) return;
-            var bytes = await _pdf.ExportYearAsync(_project, includeCover: true);
-            var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
-            await SaveBytesAsync(fileName, bytes);
-        }, busyText: "Exporting year…");
+            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+        };
+
+        // Show progress modal
+        await Shell.Current.Navigation.PushModalAsync(progressModal, true);
+
+        // Start export in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                exportedBytes = await _pdf.ExportYearAsync(_project, includeCover: true, progress, cts.Token);
+                exportCompleted = true;
+            }
+            catch (OperationCanceledException)
+            {
+                // Export was cancelled
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+                    await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+                });
+                return;
+            }
+            catch (Exception ex)
+            {
+                exportException = ex;
+            }
+
+            // Close modal and handle result
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+
+                if (exportException != null)
+                {
+                    await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+                }
+                else if (exportCompleted && exportedBytes != null)
+                {
+                    var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
+                    await SaveBytesAsync(fileName, exportedBytes);
+                }
+            });
+        });
     }
 
     private async Task SaveBytesAsync(string suggestedFileName, byte[] bytes)

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CalendarMaker_MAUI.Views.ExportProgressModal"
+             Title="Exporting Calendar">
+    <VerticalStackLayout Padding="40" Spacing="20" VerticalOptions="Center">
+        <Label Text="Exporting Calendar" 
+               FontAttributes="Bold" 
+               FontSize="20" 
+               HorizontalTextAlignment="Center" />
+        
+        <Label x:Name="StatusLabel" 
+               Text="Preparing export..." 
+               HorizontalTextAlignment="Center" 
+               FontSize="14" />
+        
+        <ProgressBar x:Name="ExportProgressBar" 
+                     Progress="0" 
+                     ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+        
+        <Label x:Name="ProgressLabel" 
+               Text="0 / 13" 
+               HorizontalTextAlignment="Center" 
+               FontSize="12" 
+               TextColor="Gray" />
+        
+        <Button x:Name="CancelBtn" 
+                Text="Cancel" 
+                HorizontalOptions="Center" 
+                WidthRequest="120" />
+    </VerticalStackLayout>
+</ContentPage>
