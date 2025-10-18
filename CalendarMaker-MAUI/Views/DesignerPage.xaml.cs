@@ -19,7 +19,7 @@ public partial class DesignerPage : ContentPage
     private readonly IPdfExportService _pdf;
     private readonly SKCanvasView _canvas;
 
-    private int _monthIndex; // 0..11 relative to StartMonth
+    private int _pageIndex; // -1=Front Cover, 0-11=Months, 12=Back Cover
 
     // gesture helpers, used to manage pan/zoom of active image
     private float _pageScale = 1f;
@@ -59,25 +59,35 @@ public partial class DesignerPage : ContentPage
             CanvasHost.Content = _canvas;
 
         BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
-        PrevBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 11) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
-        NextBtn.Clicked += (_, __) => { _monthIndex = (_monthIndex + 1) % 12; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _canvas.InvalidateSurface(); };
+        PrevBtn.Clicked += (_, __) => NavigatePage(-1);
+        NextBtn.Clicked += (_, __) => NavigatePage(1);
         AddPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
         ExportBtn.Clicked += OnExportClicked;
         ExportCoverBtn.Clicked += OnExportCoverClicked;
         ExportYearBtn.Clicked += OnExportYearClicked;
 
-        CoverSwitch.Toggled += (_, __) => { _activeSlotIndex = 0; SyncZoomUI(); _canvas.InvalidateSurface(); };
-        TitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.TitleText = TitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
-        SubtitleEntry.TextChanged += (_, __) => { if (_project != null) { _project.CoverSpec.SubtitleText = SubtitleEntry.Text; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
-
         FlipBtn.Clicked += (_, __) => FlipLayout();
         SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         ZoomSlider.ValueChanged += (_, e) => { ZoomValueLabel.Text = $"{e.NewValue:F2}x"; UpdateAssetZoom(e.NewValue); };
-        StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _monthIndex = 0; _activeSlotIndex = 0; SyncZoomUI(); UpdateMonthLabel(); _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        YearEntry.TextChanged += OnYearChanged;
+        StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _pageIndex = -1; _activeSlotIndex = 0; SyncZoomUI(); UpdatePageLabel(); _ = _storage.UpdateProjectAsync(_project); _canvas.InvalidateSurface(); } };
         FirstDowPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.FirstDayOfWeek = (DayOfWeek)FirstDowPicker.SelectedIndex; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
 
-        _monthIndex = 0; // start with first month
+        _pageIndex = -1; // start with front cover
         PopulateStaticPickers();
+    }
+
+    private void NavigatePage(int direction)
+    {
+        _pageIndex += direction;
+        // Wrap around: -1 (front cover) to 12 (back cover) = 14 total pages
+        if (_pageIndex < -1) _pageIndex = 12;
+        if (_pageIndex > 12) _pageIndex = -1;
+        
+        _activeSlotIndex = 0;
+        SyncZoomUI();
+        UpdatePageLabel();
+        _canvas.InvalidateSurface();
     }
 
     private async Task ImportPhotosToProjectAsync()
@@ -105,32 +115,53 @@ public partial class DesignerPage : ContentPage
     {
         if (_project == null) return;
 
-        // Always open the modal, even if there are no unassigned photos yet.
-        var unassignedPhotos = await _assets.GetUnassignedPhotosAsync(_project);
+        // Get all photos to show both unassigned and assigned
+        var allPhotos = await _assets.GetAllPhotosAsync(_project);
 
         string slotDescription;
-        if (CoverSwitch.IsToggled)
+        if (_pageIndex == -1)
         {
-            slotDescription = "Cover";
+            slotDescription = $"Front Cover - Slot {_activeSlotIndex + 1}";
+        }
+        else if (_pageIndex == 12)
+        {
+            slotDescription = $"Back Cover - Slot {_activeSlotIndex + 1}";
         }
         else
         {
-            var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
-            var year = _project.Year + (_project.StartMonth - 1 + _monthIndex) / 12;
+            var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+            var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
             slotDescription = $"{monthName} - Slot {_activeSlotIndex + 1}";
         }
 
-        var modal = new PhotoSelectorModal(unassignedPhotos, slotDescription);
+        var modal = new PhotoSelectorModal(allPhotos, slotDescription);
 
         // Assign selected photo to the active target
         modal.PhotoSelected += async (_, args) =>
         {
             if (_project == null) return;
             var selected = args.SelectedAsset;
-            var role = CoverSwitch.IsToggled ? "coverPhoto" : "monthPhoto";
-            int? slotIndex = CoverSwitch.IsToggled ? null : _activeSlotIndex;
-            await _assets.AssignPhotoToSlotAsync(_project, selected.Id, _monthIndex, slotIndex, role);
+            
+            string role;
+            int? monthIndex = null;
+            int? slotIndex = _activeSlotIndex;
+            
+            if (_pageIndex == -1)
+            {
+                role = "coverPhoto";
+            }
+            else if (_pageIndex == 12)
+            {
+                role = "backCoverPhoto";
+            }
+            else
+            {
+                role = "monthPhoto";
+                monthIndex = _pageIndex;
+            }
+            
+            await _assets.AssignPhotoToSlotAsync(_project, selected.Id, monthIndex ?? 0, slotIndex, role);
             SyncZoomUI();
             _canvas.InvalidateSurface();
             try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
@@ -140,21 +171,30 @@ public partial class DesignerPage : ContentPage
         modal.RemoveRequested += async (_, __) =>
         {
             if (_project == null) return;
-            if (CoverSwitch.IsToggled)
+            
+            if (_pageIndex == -1) // Front cover
             {
-                var existingCover = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-                if (existingCover != null)
+                var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+                if (existingPhoto != null)
                 {
-                    existingCover.Role = "unassigned";
-                    existingCover.MonthIndex = null;
-                    existingCover.SlotIndex = null;
+                    _project.ImageAssets.Remove(existingPhoto);
                     await _storage.UpdateProjectAsync(_project);
                 }
             }
-            else
+            else if (_pageIndex == 12) // Back cover
             {
-                await _assets.RemovePhotoFromSlotAsync(_project, _monthIndex, _activeSlotIndex, "monthPhoto");
+                var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+                if (existingPhoto != null)
+                {
+                    _project.ImageAssets.Remove(existingPhoto);
+                    await _storage.UpdateProjectAsync(_project);
+                }
             }
+            else // Month page
+            {
+                await _assets.RemovePhotoFromSlotAsync(_project, _pageIndex, _activeSlotIndex, "monthPhoto");
+            }
+            
             _canvas.InvalidateSurface();
             try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
         };
@@ -199,27 +239,75 @@ public partial class DesignerPage : ContentPage
             5 => PhotoLayout.ThreeRightStack,
             _ => PhotoLayout.Single
         };
-        _project.MonthPhotoLayouts[_monthIndex] = layout;
+        
+        // Apply to current page
+        if (_pageIndex == -1) // Front cover
+        {
+            _project.FrontCoverPhotoLayout = layout;
+        }
+        else if (_pageIndex == 12) // Back cover
+        {
+            _project.BackCoverPhotoLayout = layout;
+        }
+        else if (_pageIndex >= 0 && _pageIndex <= 11) // Month pages
+        {
+            _project.MonthPhotoLayouts[_pageIndex] = layout;
+        }
+        
         _ = _storage.UpdateProjectAsync(_project);
         _activeSlotIndex = 0;
+        SyncZoomUI();
         _canvas.InvalidateSurface();
     }
 
-    private void UpdateMonthLabel()
+    private void UpdatePageLabel()
     {
         if (_project == null) { MonthLabel.Text = string.Empty; return; }
-        var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
-        var year = _project.Year + (_project.StartMonth - 1 + _monthIndex) / 12;
-        MonthLabel.Text = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        SyncPhotoLayoutPicker();
+        
+        if (_pageIndex == -1)
+        {
+            MonthLabel.Text = "Front Cover";
+            SyncPhotoLayoutPicker();
+        }
+        else if (_pageIndex == 12)
+        {
+            MonthLabel.Text = "Back Cover";
+            SyncPhotoLayoutPicker();
+        }
+        else
+        {
+            var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+            var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
+            MonthLabel.Text = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+            SyncPhotoLayoutPicker();
+        }
     }
 
     private void SyncPhotoLayoutPicker()
     {
         if (_project == null) return;
-        var layout = _project.MonthPhotoLayouts.TryGetValue(_monthIndex, out var l)
-            ? l
-            : _project.LayoutSpec.PhotoLayout;
+        
+        PhotoLayout layout;
+        
+        if (_pageIndex == -1) // Front cover
+        {
+            layout = _project.FrontCoverPhotoLayout;
+        }
+        else if (_pageIndex == 12) // Back cover
+        {
+            layout = _project.BackCoverPhotoLayout;
+        }
+        else if (_pageIndex >= 0 && _pageIndex <= 11) // Month pages
+        {
+            layout = _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var l)
+                ? l
+                : _project.LayoutSpec.PhotoLayout;
+        }
+        else
+        {
+            return;
+        }
+        
         var idx = layout switch
         {
             PhotoLayout.TwoVerticalSplit => 1,
@@ -273,6 +361,18 @@ public partial class DesignerPage : ContentPage
         _canvas.InvalidateSurface();
     }
 
+    private void OnYearChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_project == null) return;
+        if (int.TryParse(e.NewTextValue, out var year) && year >= 1900 && year <= 2100)
+        {
+            _project.Year = year;
+            UpdatePageLabel();
+            _ = _storage.UpdateProjectAsync(_project);
+            _canvas.InvalidateSurface();
+        }
+    }
+
     private async Task WithBusyButtonAsync(Button? btn, Func<Task> action, string busyText = "Exporting…")
     {
         if (btn == null)
@@ -287,7 +387,6 @@ public partial class DesignerPage : ContentPage
         {
             btn.IsEnabled = false;
             btn.Text = busyText;
-            // yield to let UI update the button immediately
             await Task.Yield();
             await action();
         }
@@ -303,9 +402,27 @@ public partial class DesignerPage : ContentPage
         await WithBusyButtonAsync(sender as Button, async () =>
         {
             if (_project == null) return;
-            var bytes = await _pdf.ExportMonthAsync(_project, _monthIndex);
-            var month = ((_project.StartMonth - 1 + _monthIndex) % 12) + 1;
-            var fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
+            
+            byte[] bytes;
+            string fileName;
+            
+            if (_pageIndex == -1)
+            {
+                bytes = await _pdf.ExportCoverAsync(_project);
+                fileName = $"Calendar_{_project.Year}_FrontCover.pdf";
+            }
+            else if (_pageIndex == 12)
+            {
+                bytes = await _pdf.ExportBackCoverAsync(_project);
+                fileName = $"Calendar_{_project.Year}_BackCover.pdf";
+            }
+            else
+            {
+                bytes = await _pdf.ExportMonthAsync(_project, _pageIndex);
+                var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+                fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
+            }
+            
             await SaveBytesAsync(fileName, bytes);
         });
     }
@@ -329,22 +446,19 @@ public partial class DesignerPage : ContentPage
         var progressModal = new ExportProgressModal();
         progressModal.SetCancellationTokenSource(cts);
         
-        var progress = new Progress<ExportProgress>(p => progressModal.UpdateProgress(p));
+        var progress = new Progress<Services.ExportProgress>(p => progressModal.UpdateProgress(p));
 
         bool exportCompleted = false;
         byte[]? exportedBytes = null;
         Exception? exportException = null;
 
-        // Handle cancellation
         progressModal.Cancelled += async (_, __) =>
         {
             try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
         };
 
-        // Show progress modal
         await Shell.Current.Navigation.PushModalAsync(progressModal, true);
 
-        // Start export in background
         _ = Task.Run(async () =>
         {
             try
@@ -354,7 +468,6 @@ public partial class DesignerPage : ContentPage
             }
             catch (OperationCanceledException)
             {
-                // Export was cancelled
                 await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
                     try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
@@ -367,7 +480,6 @@ public partial class DesignerPage : ContentPage
                 exportException = ex;
             }
 
-            // Close modal and handle result
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
@@ -403,16 +515,15 @@ public partial class DesignerPage : ContentPage
         _project = projects.FirstOrDefault(p => p.Id == ProjectId);
         if (_project != null)
         {
-            TitleEntry.Text = _project.CoverSpec.TitleText;
-            SubtitleEntry.Text = _project.CoverSpec.SubtitleText;
             SplitSlider.Value = _project.LayoutSpec.SplitRatio;
             SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
+            YearEntry.Text = _project.Year.ToString();
             StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
             FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
             _activeSlotIndex = 0;
             SyncPhotoLayoutPicker();
             SyncZoomUI();
-            UpdateMonthLabel();
+            UpdatePageLabel();
             _canvas.InvalidateSurface();
         }
     }
@@ -443,12 +554,16 @@ public partial class DesignerPage : ContentPage
     private ImageAsset? GetActiveAsset()
     {
         if (_project == null) return null;
-        if (CoverSwitch.IsToggled)
-            return _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-        return _project.ImageAssets
-            .Where(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex && (a.SlotIndex ?? 0) == _activeSlotIndex)
-            .OrderBy(a => a.Order)
-            .FirstOrDefault();
+        
+        if (_pageIndex == -1)
+            return _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+        else if (_pageIndex == 12)
+            return _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+        else
+            return _project.ImageAssets
+                .Where(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == _activeSlotIndex)
+                .OrderBy(a => a.Order)
+                .FirstOrDefault();
     }
 
     private void UpdateAssetZoom(double newValue)
@@ -492,17 +607,27 @@ public partial class DesignerPage : ContentPage
         using var contentBorder = new SKPaint { Color = SKColors.Silver, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
         canvas.DrawRect(contentRect, contentBorder);
 
-        if (CoverSwitch.IsToggled)
+        if (_pageIndex == -1) // Front cover
         {
-            DrawCover(canvas, contentRect, _project);
+            var layout = _project.FrontCoverPhotoLayout;
+            _lastPhotoSlots = ComputePhotoSlots(contentRect, layout, true);
             _lastPhotoRect = contentRect;
-            _lastPhotoSlots = new List<SKRect> { contentRect };
+            System.Diagnostics.Debug.WriteLine($"Front Cover: Layout={layout}, Slots={_lastPhotoSlots.Count}, ActiveSlot={_activeSlotIndex}");
+            DrawCover(canvas, contentRect, _project, true);
         }
-        else
+        else if (_pageIndex == 12) // Back cover
+        {
+            var layout = _project.BackCoverPhotoLayout;
+            _lastPhotoSlots = ComputePhotoSlots(contentRect, layout, true);
+            _lastPhotoRect = contentRect;
+            System.Diagnostics.Debug.WriteLine($"Back Cover: Layout={layout}, Slots={_lastPhotoSlots.Count}, ActiveSlot={_activeSlotIndex}");
+            DrawCover(canvas, contentRect, _project, false);
+        }
+        else // Month page
         {
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
             _lastPhotoRect = photoRect;
-            _lastPhotoSlots = ComputePhotoSlots(photoRect, _project.LayoutSpec.PhotoLayout);
+            _lastPhotoSlots = ComputePhotoSlots(photoRect, _project.LayoutSpec.PhotoLayout, false);
             DrawPhotos(canvas, _lastPhotoSlots);
             DrawCalendarGrid(canvas, calRect, _project);
         }
@@ -510,10 +635,9 @@ public partial class DesignerPage : ContentPage
         canvas.Restore();
     }
 
-    private List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout)
+    private List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout, bool isCover = false)
     {
-        // Resolve per-month override
-        if (_project != null && _project.MonthPhotoLayouts.TryGetValue(_monthIndex, out var perMonth))
+        if (!isCover && _project != null && _pageIndex >= 0 && _pageIndex <= 11 && _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var perMonth))
             layout = perMonth;
         const float gap = 4f;
         var list = new List<SKRect>();
@@ -545,7 +669,6 @@ public partial class DesignerPage : ContentPage
                 }
             case PhotoLayout.ThreeLeftStack:
                 {
-                    // 2 photos stacked vertically on left (taking 50% width), 1 photo on right (taking 50% width)
                     float halfW = (area.Width - gap) / 2f;
                     float halfH = (area.Height - gap) / 2f;
                     list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
@@ -555,7 +678,6 @@ public partial class DesignerPage : ContentPage
                 }
             case PhotoLayout.ThreeRightStack:
                 {
-                    // 1 photo on left (taking 50% width), 2 photos stacked vertically on right (taking 50% width)
                     float halfW = (area.Width - gap) / 2f;
                     float halfH = (area.Height - gap) / 2f;
                     list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
@@ -577,7 +699,7 @@ public partial class DesignerPage : ContentPage
         {
             var rect = slots[i];
             var asset = _project.ImageAssets
-                .Where(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex && (a.SlotIndex ?? 0) == i)
+                .Where(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == i)
                 .OrderBy(a => a.Order)
                 .FirstOrDefault();
             if (asset == null || string.IsNullOrEmpty(asset.Path) || !File.Exists(asset.Path))
@@ -587,7 +709,6 @@ public partial class DesignerPage : ContentPage
                 canvas.DrawRect(rect, photoFill);
                 canvas.DrawRect(rect, photoBorder);
                 
-                // Draw hint text for double-click
                 if (i == _activeSlotIndex)
                 {
                     using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 12, IsAntialias = true };
@@ -609,8 +730,7 @@ public partial class DesignerPage : ContentPage
                 }
             }
 
-            // Active slot highlight
-            if (i == _activeSlotIndex && !CoverSwitch.IsToggled)
+            if (i == _activeSlotIndex)
             {
                 using var hi = new SKPaint { Color = SKColors.DeepSkyBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 2f };
                 canvas.DrawRect(rect, hi);
@@ -618,36 +738,49 @@ public partial class DesignerPage : ContentPage
         }
     }
 
-    private void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project)
+    private void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project, bool isFrontCover)
     {
-        var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-        if (asset != null && File.Exists(asset.Path))
+        var role = isFrontCover ? "coverPhoto" : "backCoverPhoto";
+        
+        for (int i = 0; i < _lastPhotoSlots.Count; i++)
         {
-            using var bmp = SKBitmap.Decode(asset.Path);
-            if (bmp != null)
+            var rect = _lastPhotoSlots[i];
+            var asset = project.ImageAssets
+                .FirstOrDefault(a => a.Role == role && (a.SlotIndex ?? 0) == i);
+            
+            if (asset != null && File.Exists(asset.Path))
             {
-                DrawBitmapWithPanZoom(canvas, bmp, bounds, asset);
+                using var bmp = SKBitmap.Decode(asset.Path);
+                if (bmp != null)
+                {
+                    canvas.Save();
+                    canvas.ClipRect(rect, antialias: true);
+                    DrawBitmapWithPanZoom(canvas, bmp, rect, asset);
+                    canvas.Restore();
+                }
+            }
+            else
+            {
+                using var fill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
+                using var border = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+                canvas.DrawRect(rect, fill);
+                canvas.DrawRect(rect, border);
+                
+                if (i == _activeSlotIndex)
+                {
+                    using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 12, IsAntialias = true };
+                    var hintText = "Double-click to assign photo";
+                    var textWidth = hintPaint.MeasureText(hintText);
+                    canvas.DrawText(hintText, rect.MidX - textWidth / 2, rect.MidY, hintPaint);
+                }
+            }
+            
+            if (i == _activeSlotIndex)
+            {
+                using var hi = new SKPaint { Color = SKColors.DeepSkyBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 2f };
+                canvas.DrawRect(rect, hi);
             }
         }
-        else
-        {
-            using var fill = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xEE) };
-            canvas.DrawRect(bounds, fill);
-            
-            // Draw hint for cover photo
-            using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 16, IsAntialias = true };
-            var hintText = "Double-click to assign cover photo";
-            var textWidth = hintPaint.MeasureText(hintText);
-            canvas.DrawText(hintText, bounds.MidX - textWidth / 2, bounds.MidY, hintPaint);
-        }
-
-        // subtitle hint
-        if (string.IsNullOrWhiteSpace(project.CoverSpec.SubtitleText))
-            return;
-        using var hint = new SKPaint { Color = new SKColor(0, 0, 0, 60), TextSize = 10, IsAntialias = true };
-        var text = "Drag to reposition • Double-tap to center • Use zoom";
-        var tw = hint.MeasureText(text);
-        canvas.DrawText(text, bounds.MidX - tw / 2, bounds.Top + 40, hint);
     }
 
     private void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
@@ -659,7 +792,6 @@ public partial class DesignerPage : ContentPage
         var imgAspect = imgW / imgH;
         var rectAspect = rectW / rectH;
 
-        // baseline cover scale to avoid letterboxing, then apply zoom
         float scale = (imgAspect > rectAspect ? rectH / imgH : rectW / imgW) * (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
 
         var targetW = imgW * scale;
@@ -670,7 +802,6 @@ public partial class DesignerPage : ContentPage
         var px = (float)Math.Clamp(asset.PanX, -1, 1);
         var py = (float)Math.Clamp(asset.PanY, -1, 1);
 
-        // Allow panning on both axes when zoomed exceeds container
         var left = rect.Left - excessX + px * excessX;
         var top = rect.Top - excessY + py * excessY;
         var dest = new SKRect(left, top, left + targetW, top + targetH);
@@ -687,12 +818,11 @@ public partial class DesignerPage : ContentPage
         if (_project == null)
             return;
 
-        // Convert touch location from DIPs to pixels using canvas size vs view width ratio
         var loc = e.Location;
         float density = 1f;
         try
         {
-            var canvasSize = _canvas.CanvasSize; // pixels
+            var canvasSize = _canvas.CanvasSize;
             if (_canvas.Width > 0)
                 density = (float)(canvasSize.Width / (float)_canvas.Width);
         }
@@ -700,21 +830,18 @@ public partial class DesignerPage : ContentPage
         var touchPx = new SKPoint((float)loc.X * density, (float)loc.Y * density);
 
         var pagePt = new SKPoint((float)((touchPx.X - _pageOffsetX) / _pageScale), (float)((touchPx.Y - _pageOffsetY) / _pageScale));
-        var isCover = CoverSwitch.IsToggled;
+        var isCover = (_pageIndex == -1 || _pageIndex == 12);
         var hitRect = isCover ? _lastContentRect : _lastPhotoRect;
 
-        // Helper to get the slot index at a point without changing selection
         int HitTestSlot(SKPoint pt)
         {
-            if (isCover) return 0;
             if (_lastPhotoSlots.Count == 0) return -1;
             return _lastPhotoSlots.FindIndex(r => r.Contains(pt));
         }
 
-        // Determine the rect of the currently active slot (may change on Pressed)
         SKRect CurrentTargetRect()
         {
-            return isCover ? hitRect : (_lastPhotoSlots.Count > _activeSlotIndex ? _lastPhotoSlots[_activeSlotIndex] : hitRect);
+            return _lastPhotoSlots.Count > _activeSlotIndex ? _lastPhotoSlots[_activeSlotIndex] : hitRect;
         }
 
         switch (e.ActionType)
@@ -722,22 +849,19 @@ public partial class DesignerPage : ContentPage
             case SKTouchAction.Pressed:
                 _isPointerDown = true;
 
-                // Only change selection on an explicit Press inside a slot
-                if (!isCover)
+                var hitIdx = HitTestSlot(pagePt);
+                System.Diagnostics.Debug.WriteLine($"Touch Pressed: HitIdx={hitIdx}, ActiveSlot={_activeSlotIndex}, PageIndex={_pageIndex}, IsCover={isCover}");
+                if (hitIdx >= 0 && hitIdx != _activeSlotIndex)
                 {
-                    var hitIdx = HitTestSlot(pagePt);
-                    if (hitIdx >= 0 && hitIdx != _activeSlotIndex)
-                    {
-                        _activeSlotIndex = hitIdx;
-                        SyncZoomUI();
-                        _canvas.InvalidateSurface();
-                    }
+                    _activeSlotIndex = hitIdx;
+                    SyncZoomUI();
+                    _canvas.InvalidateSurface();
                 }
 
                 var targetRectPressed = CurrentTargetRect();
                 var assetPressed = isCover
-                    ? _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto")
-                    : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex && (a.SlotIndex ?? 0) == _activeSlotIndex);
+                    ? _project.ImageAssets.FirstOrDefault(a => a.Role == (_pageIndex == -1 ? "coverPhoto" : "backCoverPhoto") && (a.SlotIndex ?? 0) == _activeSlotIndex)
+                    : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == _activeSlotIndex);
 
                 _pressedOnAsset = targetRectPressed.Contains(pagePt) && assetPressed != null && File.Exists(assetPressed.Path);
                 _dragStartPagePt = pagePt;
@@ -746,7 +870,6 @@ public partial class DesignerPage : ContentPage
                     using var bmp = SKBitmap.Decode(assetPressed!.Path);
                     if (bmp != null)
                     {
-                        // compute excess based on current zoom (for potential drag)
                         var imgW = (float)bmp.Width; var imgH = (float)bmp.Height;
                         var rectW = targetRectPressed.Width; var rectH = targetRectPressed.Height;
                         var imgAspect = imgW / imgH; var rectAspect = rectW / rectH;
@@ -765,12 +888,11 @@ public partial class DesignerPage : ContentPage
                 break;
 
             case SKTouchAction.Moved:
-                // Do not change selection on hover/move; only pan if dragging with pressed asset
                 if (_isPointerDown && _pressedOnAsset)
                 {
                     var assetMove = isCover
-                        ? _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto")
-                        : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _monthIndex && (a.SlotIndex ?? 0) == _activeSlotIndex);
+                        ? _project.ImageAssets.FirstOrDefault(a => a.Role == (_pageIndex == -1 ? "coverPhoto" : "backCoverPhoto") && (a.SlotIndex ?? 0) == _activeSlotIndex)
+                        : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == _activeSlotIndex);
                     var dx0 = pagePt.X - _dragStartPagePt.X;
                     var dy0 = pagePt.Y - _dragStartPagePt.Y;
                     if (!_isDragging)
@@ -804,17 +926,14 @@ public partial class DesignerPage : ContentPage
                     return;
                 }
 
-                // Only handle actions if released inside the current target
                 var targetRectReleased = CurrentTargetRect();
                 if (targetRectReleased.Contains(pagePt))
                 {
                     var now = DateTime.UtcNow;
                     if ((now - _lastTapAt).TotalMilliseconds < 300 && SKPoint.Distance(pagePt, _lastTapPt) < 10)
                     {
-                        // Double-click detected - show photo selector
                         _ = ShowPhotoSelectorAsync();
                     }
-                    // No single-click reset of pan/zoom
                     _lastTapAt = now;
                     _lastTapPt = pagePt;
                 }
@@ -844,12 +963,11 @@ public partial class DesignerPage : ContentPage
 
     private void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project)
     {
-        // Helper to draw crisp 1-device-pixel lines and snap coordinates
         float Stroke1px() => 1f / Math.Max(_pageScale, 0.0001f);
         float Snap(float v) => (float)Math.Round(v * _pageScale) / Math.Max(_pageScale, 0.0001f);
 
-        var month = ((project.StartMonth - 1 + _monthIndex) % 12) + 1;
-        var year = project.Year + (project.StartMonth - 1 + _monthIndex) / 12;
+        var month = ((project.StartMonth - 1 + _pageIndex) % 12) + 1;
+        var year = project.Year + (project.StartMonth - 1 + _pageIndex) / 12;
         var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
         float headerH = 40;
@@ -877,23 +995,21 @@ public partial class DesignerPage : ContentPage
             var t = displayDows[c];
             var tw = textPaint.MeasureText(t);
             canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            // Optional: light separators for header
             var x0 = Snap(cell.Left);
             var x1 = Snap(cell.Right);
             var y0 = Snap(cell.Top);
             var y1 = Snap(cell.Bottom);
-            canvas.DrawLine(x0, y0, x1, y0, gridPen); // top
-            canvas.DrawLine(x0, y1, x1, y1, gridPen); // bottom
-            canvas.DrawLine(x0, y0, x0, y1, gridPen); // left
+            canvas.DrawLine(x0, y0, x1, y0, gridPen);
+            canvas.DrawLine(x0, y1, x1, y1, gridPen);
+            canvas.DrawLine(x0, y0, x0, y1, gridPen);
             if (c == 6)
-                canvas.DrawLine(x1, y0, x1, y1, gridPen); // right edge only once
+                canvas.DrawLine(x1, y0, x1, y1, gridPen);
         }
 
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         if (rows <= 0)
         {
-            // Still draw the outer border for the area where days would be
             var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
             var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
             canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
@@ -902,7 +1018,6 @@ public partial class DesignerPage : ContentPage
 
         float rowH = weeksArea.Height / rows;
 
-        // Draw day numbers (no per-cell rectangles to avoid double-stroke seams)
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < 7; c++)
@@ -922,26 +1037,22 @@ public partial class DesignerPage : ContentPage
             }
         }
 
-        // Single-pass grid lines snapped to device pixels
         var wx0 = Snap(weeksArea.Left);
         var wx1 = Snap(weeksArea.Right);
         var wy0 = Snap(weeksArea.Top);
         var wy1 = Snap(weeksArea.Bottom);
 
-        // Vertical lines (including outer edges)
         for (int c = 0; c <= 7; c++)
         {
             var x = Snap(weeksArea.Left + c * colW);
             canvas.DrawLine(x, wy0, x, wy1, gridPen);
         }
-        // Horizontal lines (including outer edges)
         for (int r = 0; r <= rows; r++)
         {
             var y = Snap(weeksArea.Top + r * rowH);
             canvas.DrawLine(wx0, y, wx1, y, gridPen);
         }
 
-        // Final outer border reinforcement
         canvas.DrawRect(new SKRect(wx0, wy0, wx1, wy1), gridPen);
     }
 

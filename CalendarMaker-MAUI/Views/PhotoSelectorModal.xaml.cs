@@ -13,7 +13,7 @@ public partial class PhotoSelectorModal : ContentPage
     public event EventHandler? RemoveRequested;
     public event EventHandler? Cancelled;
 
-    public PhotoSelectorModal(IEnumerable<ImageAsset> unassignedPhotos, string slotDescription)
+    public PhotoSelectorModal(IEnumerable<ImageAsset> allPhotos, string slotDescription)
     {
         InitializeComponent();
         
@@ -31,24 +31,44 @@ public partial class PhotoSelectorModal : ContentPage
         AssignBtn.Clicked += OnAssignClicked;
 
         // Load photos
-        LoadPhotos(unassignedPhotos);
+        LoadPhotos(allPhotos);
         
         // Update status
         UpdateStatus();
     }
 
-    private void LoadPhotos(IEnumerable<ImageAsset> unassignedPhotos)
+    private void LoadPhotos(IEnumerable<ImageAsset> allPhotos)
     {
         _photos.Clear();
         
-        foreach (var asset in unassignedPhotos.OrderBy(a => a.Id))
-        {
-            _photos.Add(new PhotoItem
+        // Group by path to determine if unassigned version exists and if photo is in use
+        var photosByPath = allPhotos.GroupBy(a => a.Path).ToList();
+        
+        // Sort: not in use first, then by filename
+        var sortedPhotos = photosByPath
+            .Select(group => 
             {
-                Asset = asset,
-                Path = asset.Path,
-                IsSelected = false
-            });
+                var representative = group.First();
+                var hasUnassigned = group.Any(a => a.Role == "unassigned");
+                var isInUse = group.Any(a => a.Role != "unassigned");
+                
+                return new PhotoItem
+                {
+                    Asset = representative,
+                    Path = representative.Path,
+                    FileName = System.IO.Path.GetFileName(representative.Path),
+                    IsUnassigned = hasUnassigned,
+                    IsInUse = isInUse,
+                    IsSelected = false
+                };
+            })
+            .OrderBy(p => p.IsInUse) // Not in use first (false < true)
+            .ThenBy(p => p.FileName) // Then alphabetically by filename
+            .ToList();
+        
+        foreach (var photo in sortedPhotos)
+        {
+            _photos.Add(photo);
         }
 
         if (!_photos.Any())
@@ -116,6 +136,9 @@ public class PhotoItem : INotifyPropertyChanged
     
     public ImageAsset? Asset { get; set; }
     public string? Path { get; set; }
+    public string? FileName { get; set; }
+    public bool IsUnassigned { get; set; }
+    public bool IsInUse { get; set; }
     
     public bool IsSelected
     {

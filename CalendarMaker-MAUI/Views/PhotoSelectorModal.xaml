@@ -77,7 +77,39 @@
                                        Aspect="AspectFill"
                                        HeightRequest="120"
                                        WidthRequest="120" />
-                                <!-- Overlay for selection -->
+                                       
+                                <!-- Filename label at bottom with semi-transparent background -->
+                                <Border VerticalOptions="End" 
+                                        BackgroundColor="#CC000000"
+                                        Padding="4,2">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="0,0,6,6" />
+                                    </Border.StrokeShape>
+                                    <Label Text="{Binding FileName}" 
+                                           TextColor="White"
+                                           FontSize="10"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="1"
+                                           HorizontalOptions="Fill" />
+                                </Border>
+                                
+                                <!-- "IN USE" badge for photos already in calendar -->
+                                <Border HorizontalOptions="End" 
+                                        VerticalOptions="Start"
+                                        BackgroundColor="#FFAA3333"
+                                        Padding="6,2"
+                                        Margin="4"
+                                        IsVisible="{Binding IsInUse}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="4" />
+                                    </Border.StrokeShape>
+                                    <Label Text="IN USE" 
+                                           TextColor="White"
+                                           FontSize="9"
+                                           FontAttributes="Bold" />
+                                </Border>
+                                
+                                <!-- Selection overlay -->
                                 <Border BackgroundColor="#33007ACC">
                                     <Border.StrokeShape>
                                         <RoundRectangle CornerRadius="8" />
@@ -85,9 +117,9 @@
                                     <Border.IsVisible>
                                         <Binding Path="IsSelected" />
                                     </Border.IsVisible>
-                                    <Label Text="?" 
+                                    <Label Text="✓" 
                                            TextColor="White"
-                                           FontSize="24"
+                                           FontSize="32"
                                            FontAttributes="Bold"
                                            HorizontalOptions="Center"
                                            VerticalOptions="Center" />

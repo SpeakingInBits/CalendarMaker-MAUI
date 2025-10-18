@@ -18,6 +18,7 @@ public interface IPdfExportService
 {
     Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex);
     Task<byte[]> ExportCoverAsync(CalendarProject project);
+    Task<byte[]> ExportBackCoverAsync(CalendarProject project);
     Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default);
 }
 
@@ -26,20 +27,24 @@ public sealed class PdfExportService : IPdfExportService
     private const float TargetDpi = 300f; // 300 DPI print quality
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
-        => RenderDocumentAsync(project, new[] { (monthIndex, false) }, null, default);
+        => RenderDocumentAsync(project, new[] { (monthIndex, false, false) }, null, default);
 
     public Task<byte[]> ExportCoverAsync(CalendarProject project)
-        => RenderDocumentAsync(project, new[] { (0, true) }, null, default);
+        => RenderDocumentAsync(project, new[] { (0, true, false) }, null, default);
+
+    public Task<byte[]> ExportBackCoverAsync(CalendarProject project)
+        => RenderDocumentAsync(project, new[] { (0, false, true) }, null, default);
 
     public Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var pages = new List<(int idx, bool cover)>();
-        if (includeCover) pages.Add((0, true));
-        for (int i = 0; i < 12; i++) pages.Add((i, false));
+        var pages = new List<(int idx, bool cover, bool backCover)>();
+        if (includeCover) pages.Add((0, true, false));
+        for (int i = 0; i < 12; i++) pages.Add((i, false, false));
+        pages.Add((0, false, true)); // back cover
         return RenderDocumentAsync(project, pages, progress, cancellationToken);
     }
 
-    private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover)> pages, IProgress<ExportProgress>? progress, CancellationToken cancellationToken)
+    private Task<byte[]> RenderDocumentAsync(CalendarProject project, IEnumerable<(int idx, bool cover, bool backCover)> pages, IProgress<ExportProgress>? progress, CancellationToken cancellationToken)
     {
         return Task.Run(async () =>
         {
@@ -80,7 +85,7 @@ public sealed class PdfExportService : IPdfExportService
                     var p = pagesList[pageIndex];
                     
                     // Render page to JPEG bytes
-                    renderedPages[pageIndex] = RenderPageToJpeg(project, p.idx, p.cover, pageWpt, pageHpt, TargetDpi, imageCache);
+                    renderedPages[pageIndex] = RenderPageToJpeg(project, p.idx, p.cover, p.backCover, pageWpt, pageHpt, TargetDpi, imageCache);
                     
                     // Update progress in thread-safe manner
                     int currentCompleted;
@@ -93,12 +98,14 @@ public sealed class PdfExportService : IPdfExportService
                     // Report progress
                     if (progress != null)
                     {
-                        var month = p.cover ? "Cover" : new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                        var pageName = p.cover ? "Front Cover" : 
+                                      p.backCover ? "Back Cover" : 
+                                      new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
                         progress.Report(new ExportProgress 
                         { 
                             CurrentPage = currentCompleted, 
                             TotalPages = totalPages, 
-                            Status = $"Rendering {month}... ({currentCompleted}/{totalPages})"
+                            Status = $"Rendering {pageName}... ({currentCompleted}/{totalPages})"
                         });
                     }
                 });
@@ -187,7 +194,7 @@ public sealed class PdfExportService : IPdfExportService
 #endif
     }
 
-    private byte[] RenderPageToJpeg(CalendarProject project, int monthIndex, bool renderCover, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
+    private byte[] RenderPageToJpeg(CalendarProject project, int monthIndex, bool renderCover, bool renderBackCover, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
     {
         // Points to pixels scale factor
         float scale = targetDpi / 72f;
@@ -205,17 +212,41 @@ public sealed class PdfExportService : IPdfExportService
 
         if (renderCover)
         {
-            // Clip to keep image overflow hidden
-            sk.Save(); sk.ClipRect(contentRect, antialias: true);
-            var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto");
-            if (asset != null && File.Exists(asset.Path))
+            // Front cover - support multiple photo slots
+            var layout = project.FrontCoverPhotoLayout;
+            var slots = ComputePhotoSlots(contentRect, layout);
+            foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
-                var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-                if (bmp != null)
-                    DrawBitmapWithPanZoom(sk, bmp, contentRect, asset);
+                sk.Save(); sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets
+                    .FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
             }
-            sk.Restore();
-            DrawCoverText(sk, contentRect, project);
+        }
+        else if (renderBackCover)
+        {
+            // Back cover - support multiple photo slots
+            var layout = project.BackCoverPhotoLayout;
+            var slots = ComputePhotoSlots(contentRect, layout);
+            foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
+            {
+                sk.Save(); sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets
+                    .FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
+            }
         }
         else
         {
@@ -364,18 +395,6 @@ public sealed class PdfExportService : IPdfExportService
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.DrawBitmap(bmp, dest, paint);
-    }
-
-    private static void DrawCoverText(SKCanvas canvas, SKRect bounds, CalendarProject project)
-    {
-        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.TitleFontSizePt, IsAntialias = true };
-        using var subtitlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = (float)project.Theme.SubtitleFontSizePt, IsAntialias = true };
-        var title = project.CoverSpec.TitleText ?? string.Empty;
-        var subtitle = project.CoverSpec.SubtitleText ?? string.Empty;
-        var tw = titlePaint.MeasureText(title);
-        canvas.DrawText(title, bounds.MidX - tw / 2, bounds.Top + titlePaint.TextSize + 10, titlePaint);
-        var sw = subtitlePaint.MeasureText(subtitle);
-        canvas.DrawText(subtitle, bounds.MidX - sw / 2, bounds.Top + titlePaint.TextSize + 20 + subtitlePaint.TextSize, subtitlePaint);
     }
 
     private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex)
