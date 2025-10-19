@@ -19,6 +19,11 @@
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Layout" FontAttributes="Bold" />
                 <Button Text="Flip Layout" x:Name="FlipBtn" />
+                <!-- Borderless checkbox (only visible on cover pages) -->
+                <HorizontalStackLayout x:Name="BorderlessControl" Spacing="6" IsVisible="False">
+                    <CheckBox x:Name="BorderlessCheckBox" VerticalOptions="Center" />
+                    <Label Text="Borderless (no margins)" VerticalOptions="Center" />
+                </HorizontalStackLayout>
                 <!-- Split slider with reset -->
                 <Grid x:Name="SplitControlGrid" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
                     <Label Text="Split" />

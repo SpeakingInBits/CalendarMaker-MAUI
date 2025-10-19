@@ -67,6 +67,7 @@ public partial class DesignerPage : ContentPage
         ExportYearBtn.Clicked += OnExportYearClicked;
 
         FlipBtn.Clicked += (_, __) => FlipLayout();
+        BorderlessCheckBox.CheckedChanged += OnBorderlessChanged;
         SplitSlider.ValueChanged += (_, e) => { SplitValueLabel.Text = e.NewValue.ToString("P0"); if (_project != null) { _project.LayoutSpec.SplitRatio = e.NewValue; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
         ZoomSlider.ValueChanged += (_, e) => { ZoomValueLabel.Text = $"{e.NewValue:F2}x"; UpdateAssetZoom(e.NewValue); };
         YearEntry.TextChanged += OnYearChanged;
@@ -290,6 +291,36 @@ public partial class DesignerPage : ContentPage
         // Hide split control for cover pages (front cover: -1, back cover: 12)
         bool isCoverPage = _pageIndex == -1 || _pageIndex == 12;
         SplitControlGrid.IsVisible = !isCoverPage;
+        
+        // Show borderless option only on cover pages
+        BorderlessControl.IsVisible = isCoverPage;
+        
+        // Sync borderless checkbox state
+        if (_project != null && isCoverPage)
+        {
+            BorderlessCheckBox.CheckedChanged -= OnBorderlessChanged; // Temporarily remove handler
+            BorderlessCheckBox.IsChecked = _pageIndex == -1 
+                ? _project.CoverSpec.BorderlessFrontCover 
+                : _project.CoverSpec.BorderlessBackCover;
+            BorderlessCheckBox.CheckedChanged += OnBorderlessChanged; // Re-add handler
+        }
+    }
+    
+    private void OnBorderlessChanged(object? sender, CheckedChangedEventArgs e)
+    {
+        if (_project == null) return;
+        
+        if (_pageIndex == -1)
+        {
+            _project.CoverSpec.BorderlessFrontCover = e.Value;
+        }
+        else if (_pageIndex == 12)
+        {
+            _project.CoverSpec.BorderlessBackCover = e.Value;
+        }
+        
+        _ = _storage.UpdateProjectAsync(_project);
+        _canvas.InvalidateSurface();
     }
 
     private void SyncPhotoLayoutPicker()
@@ -610,11 +641,36 @@ public partial class DesignerPage : ContentPage
         using var pageBorder = new SKPaint { Color = SKColors.LightGray, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
         canvas.DrawRect(pageRect, pageBorder);
 
+        // Determine content rect based on page type and borderless settings
         var m = _project.Margins;
-        var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
+        SKRect contentRect;
+        
+        if (_pageIndex == -1 && _project.CoverSpec.BorderlessFrontCover)
+        {
+            // Front cover with borderless - use full page
+            contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
+        }
+        else if (_pageIndex == 12 && _project.CoverSpec.BorderlessBackCover)
+        {
+            // Back cover with borderless - use full page
+            contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
+        }
+        else
+        {
+            // Normal margins
+            contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
+        }
+        
         _lastContentRect = contentRect;
-        using var contentBorder = new SKPaint { Color = SKColors.Silver, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
-        canvas.DrawRect(contentRect, contentBorder);
+        
+        // Only draw content border if not borderless
+        bool isBorderless = (_pageIndex == -1 && _project.CoverSpec.BorderlessFrontCover) ||
+                           (_pageIndex == 12 && _project.CoverSpec.BorderlessBackCover);
+        if (!isBorderless)
+        {
+            using var contentBorder = new SKPaint { Color = SKColors.Silver, Style = SKPaintStyle.Stroke, StrokeWidth = 1f / (float)scale };
+            canvas.DrawRect(contentRect, contentBorder);
+        }
 
         if (_pageIndex == -1) // Front cover
         {
