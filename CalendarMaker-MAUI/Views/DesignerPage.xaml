@@ -8,11 +8,11 @@
         <ScrollView Grid.Column="0" VerticalScrollBarVisibility="Always" Padding="0,0,10,0">
             <VerticalStackLayout Spacing="10">
                 <Label Text="Designer" FontAttributes="Bold" />
-                <HorizontalStackLayout Spacing="6">
-                    <Button Text="Prev" x:Name="PrevBtn" />
-                    <Label x:Name="MonthLabel" VerticalTextAlignment="Center" />
-                    <Button Text="Next" x:Name="NextBtn" />
-                </HorizontalStackLayout>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                    <Button Text="Prev" x:Name="PrevBtn" Grid.Column="0" />
+                    <Label x:Name="MonthLabel" Grid.Column="1" VerticalTextAlignment="Center" HorizontalTextAlignment="Center" />
+                    <Button Text="Next" x:Name="NextBtn" Grid.Column="2" />
+                </Grid>
 
                 <Button Text="Add Photo" x:Name="AddPhotoBtn" />
 
