@@ -281,6 +281,15 @@ public partial class DesignerPage : ContentPage
             MonthLabel.Text = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
             SyncPhotoLayoutPicker();
         }
+        
+        UpdateSplitControlVisibility();
+    }
+    
+    private void UpdateSplitControlVisibility()
+    {
+        // Hide split control for cover pages (front cover: -1, back cover: 12)
+        bool isCoverPage = _pageIndex == -1 || _pageIndex == 12;
+        SplitControlGrid.IsVisible = !isCoverPage;
     }
 
     private void SyncPhotoLayoutPicker()

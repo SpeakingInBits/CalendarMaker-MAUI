@@ -20,7 +20,7 @@
                 <Label Text="Layout" FontAttributes="Bold" />
                 <Button Text="Flip Layout" x:Name="FlipBtn" />
                 <!-- Split slider with reset -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
+                <Grid x:Name="SplitControlGrid" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
                     <Label Text="Split" />
                     <Slider x:Name="SplitSlider" Grid.Column="1" Minimum="0.3" Maximum="0.7" />
                     <Label x:Name="SplitValueLabel" Grid.Column="2" />
