@@ -207,8 +207,25 @@ public sealed class PdfExportService : IPdfExportService
         // Draw using page points coordinate system scaled to target DPI
         sk.Scale(scale);
 
+        // Use full page for borderless covers, otherwise use margins
         var m = project.Margins;
-        var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
+        SKRect contentRect;
+        
+        if (renderCover && project.CoverSpec.BorderlessFrontCover)
+        {
+            // Front cover with borderless - use full page
+            contentRect = new SKRect(0, 0, pageWpt, pageHpt);
+        }
+        else if (renderBackCover && project.CoverSpec.BorderlessBackCover)
+        {
+            // Back cover with borderless - use full page
+            contentRect = new SKRect(0, 0, pageWpt, pageHpt);
+        }
+        else
+        {
+            // Normal margins
+            contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
+        }
 
         if (renderCover)
         {
