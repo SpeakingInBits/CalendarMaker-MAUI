@@ -126,101 +126,107 @@ public partial class DesignerPage : ContentPage
         var allPhotos = await _assets.GetAllPhotosAsync(_project);
 
         string slotDescription;
-        if (_pageIndex == -1)
+      if (_pageIndex == -2)
         {
-            slotDescription = $"Front Cover - Slot {_activeSlotIndex + 1}";
+   // Previous year's December
+    var prevYear = _project.Year - 1;
+    slotDescription = $"December {prevYear} (Prev Year) - Slot {_activeSlotIndex + 1}";
         }
-        else if (_pageIndex == 12)
+        else if (_pageIndex == -1)
         {
-            slotDescription = $"Back Cover - Slot {_activeSlotIndex + 1}";
+         slotDescription = $"Front Cover - Slot {_activeSlotIndex + 1}";
+        }
+     else if (_pageIndex == 12)
+        {
+slotDescription = $"Back Cover - Slot {_activeSlotIndex + 1}";
         }
         else
-        {
-            var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
-            var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
-            var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
-            slotDescription = $"{monthName} - Slot {_activeSlotIndex + 1}";
-        }
+     {
+     var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+ var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
+     var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+         slotDescription = $"{monthName} - Slot {_activeSlotIndex + 1}";
+     }
 
-        var modal = new PhotoSelectorModal(allPhotos, slotDescription);
+   var modal = new PhotoSelectorModal(allPhotos, slotDescription);
 
         // Assign selected photo to the active target
         modal.PhotoSelected += async (_, args) =>
         {
-            if (_project == null) return;
-            var selected = args.SelectedAsset;
+   if (_project == null) return;
+     var selected = args.SelectedAsset;
             
             string role;
-            int? monthIndex = null;
-            int? slotIndex = _activeSlotIndex;
-            
-            if (_pageIndex == -1)
-            {
-                role = "coverPhoto";
-            }
-            else if (_pageIndex == 12)
-            {
-                role = "backCoverPhoto";
-            }
-            else
-            {
-                role = "monthPhoto";
-                monthIndex = _pageIndex;
-            }
-            
-            await _assets.AssignPhotoToSlotAsync(_project, selected.Id, monthIndex ?? 0, slotIndex, role);
-            SyncZoomUI();
-            _canvas.InvalidateSurface();
+        int? monthIndex = null;
+          int? slotIndex = _activeSlotIndex;
+          
+   if (_pageIndex == -1)
+    {
+            role = "coverPhoto";
+      }
+   else if (_pageIndex == 12)
+        {
+    role = "backCoverPhoto";
+  }
+     else
+        {
+        role = "monthPhoto";
+    monthIndex = _pageIndex; // This handles -2 for previous December
+        }
+ 
+   await _assets.AssignPhotoToSlotAsync(_project, selected.Id, monthIndex ?? 0, slotIndex, role);
+    SyncZoomUI();
+    _canvas.InvalidateSurface();
             try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
         };
 
-        // Remove any existing photo from the active target
-        modal.RemoveRequested += async (_, __) =>
+    // Remove any existing photo from the active target
+     modal.RemoveRequested += async (_, __) =>
         {
-            if (_project == null) return;
+       if (_project == null) return;
             
             if (_pageIndex == -1) // Front cover
             {
-                var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+      var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
                 if (existingPhoto != null)
-                {
-                    _project.ImageAssets.Remove(existingPhoto);
-                    await _storage.UpdateProjectAsync(_project);
-                }
+        {
+   _project.ImageAssets.Remove(existingPhoto);
+   await _storage.UpdateProjectAsync(_project);
+         }
             }
-            else if (_pageIndex == 12) // Back cover
-            {
-                var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
-                if (existingPhoto != null)
-                {
-                    _project.ImageAssets.Remove(existingPhoto);
-                    await _storage.UpdateProjectAsync(_project);
-                }
+       else if (_pageIndex == 12) // Back cover
+        {
+        var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+             if (existingPhoto != null)
+       {
+         _project.ImageAssets.Remove(existingPhoto);
+await _storage.UpdateProjectAsync(_project);
+       }
+      }
+            else // Month page (including -2 for previous December)
+       {
+     await _assets.RemovePhotoFromSlotAsync(_project, _pageIndex, _activeSlotIndex, "monthPhoto");
             }
-            else // Month page
-            {
-                await _assets.RemovePhotoFromSlotAsync(_project, _pageIndex, _activeSlotIndex, "monthPhoto");
-            }
-            
+ 
             _canvas.InvalidateSurface();
             try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-        };
+  };
 
         // Close without changes
-        modal.Cancelled += async (_, __) =>
-        {
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-        };
+   modal.Cancelled += async (_, __) =>
+      {
+          try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+      };
 
-        try
+     try
         {
             await Shell.Current.Navigation.PushModalAsync(modal, true);
-        }
+   }
         catch
         {
             // Fallback if Shell not available
-            await Navigation.PushModalAsync(modal, true);
-        }
+ await Navigation.PushModalAsync(modal, true);
+     }
     }
 
     private void PopulateStaticPickers()
@@ -248,22 +254,22 @@ public partial class DesignerPage : ContentPage
         };
         
         // Apply to current page
-        if (_pageIndex == -1) // Front cover
+      if (_pageIndex == -1) // Front cover
+      {
+     _project.FrontCoverPhotoLayout = layout;
+}
+      else if (_pageIndex == 12) // Back cover
         {
-            _project.FrontCoverPhotoLayout = layout;
+      _project.BackCoverPhotoLayout = layout;
         }
-        else if (_pageIndex == 12) // Back cover
-        {
-            _project.BackCoverPhotoLayout = layout;
-        }
-        else if (_pageIndex >= 0 && _pageIndex <= 11) // Month pages
+        else if (_pageIndex >= -2 && _pageIndex <= 11) // Month pages (including -2 for previous December)
         {
             _project.MonthPhotoLayouts[_pageIndex] = layout;
         }
         
         _ = _storage.UpdateProjectAsync(_project);
         _activeSlotIndex = 0;
-        SyncZoomUI();
+ SyncZoomUI();
         _canvas.InvalidateSurface();
     }
 
@@ -358,37 +364,37 @@ public partial class DesignerPage : ContentPage
     {
         if (_project == null) return;
         
-        PhotoLayout layout;
-        
-        if (_pageIndex == -1) // Front cover
+      PhotoLayout layout;
+  
+ if (_pageIndex == -1) // Front cover
         {
-            layout = _project.FrontCoverPhotoLayout;
+layout = _project.FrontCoverPhotoLayout;
+ }
+   else if (_pageIndex == 12) // Back cover
+  {
+   layout = _project.BackCoverPhotoLayout;
         }
-        else if (_pageIndex == 12) // Back cover
+   else if (_pageIndex >= -2 && _pageIndex <= 11) // Month pages (including -2 for previous December)
         {
-            layout = _project.BackCoverPhotoLayout;
+    layout = _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var l)
+       ? l
+   : _project.LayoutSpec.PhotoLayout;
         }
-        else if (_pageIndex >= 0 && _pageIndex <= 11) // Month pages
-        {
-            layout = _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var l)
-                ? l
-                : _project.LayoutSpec.PhotoLayout;
+      else
+   {
+   return;
         }
-        else
-        {
-            return;
-        }
-        
-        var idx = layout switch
-        {
-            PhotoLayout.TwoVerticalSplit => 1,
-            PhotoLayout.Grid2x2 => 2,
+     
+      var idx = layout switch
+     {
+   PhotoLayout.TwoVerticalSplit => 1,
+    PhotoLayout.Grid2x2 => 2,
             PhotoLayout.TwoHorizontalStack => 3,
-            PhotoLayout.ThreeLeftStack => 4,
-            PhotoLayout.ThreeRightStack => 5,
-            _ => 0
-        };
-        PhotoLayoutPicker.SelectedIndex = idx;
+    PhotoLayout.ThreeLeftStack => 4,
+     PhotoLayout.ThreeRightStack => 5,
+  _ => 0
+    };
+   PhotoLayoutPicker.SelectedIndex = idx;
     }
 
 #if WINDOWS
@@ -1310,7 +1316,7 @@ var cell = new SKRect(left, top, right, bottom);
 
         var wx0 = Snap(weeksArea.Left);
         var wx1 = Snap(weeksArea.Right);
-      var wy0 = Snap(weeksArea.Top);
+        var wy0 = Snap(weeksArea.Top);
         var wy1 = Snap(weeksArea.Bottom);
 
      for (int c = 0; c <= 7; c++)
