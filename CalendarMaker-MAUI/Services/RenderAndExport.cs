@@ -42,55 +42,56 @@ public sealed class PdfExportService : IPdfExportService
     {
         var pages = new List<DoubleSidedPageSpec>();
 
-     // Check if we need to include previous December
+      // Check if we need to include previous December
       bool includePreviousDecember = project.EnableDoubleSided;
         
-        // Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
-        // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
+     // Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
+   // Even pages are rotated 180 degrees for proper double-sided printing
+      // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
       
-        // Page 1: June photo and June month (normal: photo left, calendar right)
+ // Page 1: June photo and June month (normal)
         pages.Add(new DoubleSidedPageSpec(0, 0, false, false, false, false));
     
-        // Page 2: May month and July photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(1, 11, false, false, false, true));
+        // Page 2: July photo and May month (rotated 180°)
+     pages.Add(new DoubleSidedPageSpec(1, 11, false, false, true, false));
      
-   // Page 3: May photo and July month (normal: photo left, calendar right)
-        pages.Add(new DoubleSidedPageSpec(11, 1, false, false, false, false));
+        // Page 3: May photo and July month (normal)
+  pages.Add(new DoubleSidedPageSpec(11, 1, false, false, false, false));
  
-        // Page 4: April month and August photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(2, 10, false, false, false, true));
+   // Page 4: August photo and April month (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(2, 10, false, false, true, false));
   
-   // Page 5: April photo and August month (normal: photo left, calendar right)
-   pages.Add(new DoubleSidedPageSpec(10, 2, false, false, false, false));
+        // Page 5: April photo and August month (normal)
+        pages.Add(new DoubleSidedPageSpec(10, 2, false, false, false, false));
   
-        // Page 6: March month and September photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(3, 9, false, false, false, true));
+        // Page 6: September photo and March month (rotated 180°)
+ pages.Add(new DoubleSidedPageSpec(3, 9, false, false, true, false));
   
-        // Page 7: March photo and September month (normal: photo left, calendar right)
+      // Page 7: March photo and September month (normal)
         pages.Add(new DoubleSidedPageSpec(9, 3, false, false, false, false));
   
-      // Page 8: Feb month and October photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(4, 8, false, false, false, true));
+     // Page 8: October photo and Feb month (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(4, 8, false, false, true, false));
         
-        // Page 9: Feb photo and October month (normal: photo left, calendar right)
+        // Page 9: Feb photo and October month (normal)
         pages.Add(new DoubleSidedPageSpec(8, 4, false, false, false, false));
    
-     // Page 10: Jan month and November photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(5, 7, false, false, false, true));
+        // Page 10: November photo and Jan month (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(5, 7, false, false, true, false));
      
-        // Page 11: Jan photo and November month (normal: photo left, calendar right)
-   pages.Add(new DoubleSidedPageSpec(7, 5, false, false, false, false));
+        // Page 11: Jan photo and November month (normal)
+        pages.Add(new DoubleSidedPageSpec(7, 5, false, false, false, false));
         
-        // Page 12: Dec prev year month and December curr year photo (swapped: calendar left, photo right)
-        pages.Add(new DoubleSidedPageSpec(6, 6, includePreviousDecember, false, false, true));
+        // Page 12: December curr year photo and Dec prev year month (rotated 180°)
+    pages.Add(new DoubleSidedPageSpec(6, 6, includePreviousDecember, false, true, false));
     
-        // Page 13: Dec prev year photo and December curr year month (normal: photo left, calendar right)
+        // Page 13: Dec prev year photo and December curr year month (normal)
         pages.Add(new DoubleSidedPageSpec(6, 6, includePreviousDecember, false, false, false));
   
-        // Page 14: Front cover and rear cover (split page)
-        pages.Add(new DoubleSidedPageSpec(0, 0, false, true, false, false));
+    // Page 14: Front cover and rear cover (split page, rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true, false));
 
-  return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
+   return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
     }
 
     private record DoubleSidedPageSpec(int PhotoMonthIndex, int CalendarMonthIndex, bool UsePreviousYearPhoto, bool IsCoversPage, bool Rotated, bool SwapPhotoAndCalendar);
@@ -281,63 +282,55 @@ public sealed class PdfExportService : IPdfExportService
         {
             // Regular page: photo on one side, calendar on the other
             (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
-      
-      // If SwapPhotoAndCalendar is true, swap the rectangles
-  if (pageSpec.SwapPhotoAndCalendar)
-      {
-   (photoRect, calRect) = (calRect, photoRect);
-      }
 
-    // Get photo layout for the photo month
-    var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
- ? perMonth
-        : project.LayoutSpec.PhotoLayout;
+            // Get photo layout for the photo month
+            var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
+    ? perMonth
+    : project.LayoutSpec.PhotoLayout;
 
- // Draw photos
-     var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
-      foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
-       {
-    sk.Save();
+            // Draw photos
+            var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
+            foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
+            {
+            sk.Save();
           sk.ClipRect(rect, antialias: true);
 
-          var photoMonthIndex = pageSpec.PhotoMonthIndex;
-  
-  // When UsePreviousYearPhoto is true and we're looking for December (month 6 in 0-indexed from start),
-      // we need to find photos assigned to the "previous December" page (index -2 in designer)
-      // For the double-sided export, these photos are stored with a special indicator
-  // In the designer, page -2 represents previous December, which maps to month index 6 
-       // but we need to identify them as "previous year" photos
-  
-          ImageAsset? asset = null;
-   if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == 6)
- {
- // Look for photos assigned to previous year's December
-   // These are stored with MonthIndex = -2 in the designer
-     asset = project.ImageAssets
+     var photoMonthIndex = pageSpec.PhotoMonthIndex;
+
+     // When UsePreviousYearPhoto is true and we're looking for December (month 6 in 0-indexed from start),
+     // we need to find photos assigned to the "previous December" page (index -2 in designer)
+    // These are stored with MonthIndex = -2 in the designer
+
+    ImageAsset? asset = null;
+            if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == 6)
+    {
+     // Look for photos assigned to previous year's December
+     // These are stored with MonthIndex = -2 in the designer
+             asset = project.ImageAssets
      .Where(a => a.Role == "monthPhoto" && a.MonthIndex == -2 && (a.SlotIndex ?? 0) == slotIndex)
-   .OrderBy(a => a.Order)
-   .FirstOrDefault();
-    }
-     else
-   {
-       asset = project.ImageAssets
-     .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
-.OrderBy(a => a.Order)
- .FirstOrDefault();
-    }
+      .OrderBy(a => a.Order)
+    .FirstOrDefault();
+     }
+          else
+              {
+     asset = project.ImageAssets
+          .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
+  .OrderBy(a => a.Order)
+     .FirstOrDefault();
+  }
 
    if (asset != null && File.Exists(asset.Path))
-          {
-    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-        if (bmp != null)
-   DrawBitmapWithPanZoom(sk, bmp, rect, asset);
-      }
-        sk.Restore();
- }
+        {
+   var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+    if (bmp != null)
+                DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+    }
+         sk.Restore();
+   }
 
-     // Draw calendar for the calendar month
+ // Draw calendar for the calendar month
      DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex);
-     }
+  }
 
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
