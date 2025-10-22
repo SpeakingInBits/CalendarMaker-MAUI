@@ -20,6 +20,8 @@ public interface IPdfExportService
     Task<byte[]> ExportCoverAsync(CalendarProject project);
     Task<byte[]> ExportBackCoverAsync(CalendarProject project);
     Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default);
+
+    Task<byte[]> ExportDoubleSidedAsync(CalendarProject project, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default);
 }
 
 public sealed class PdfExportService : IPdfExportService
@@ -34,6 +36,275 @@ public sealed class PdfExportService : IPdfExportService
 
     public Task<byte[]> ExportBackCoverAsync(CalendarProject project)
         => RenderDocumentAsync(project, new[] { (0, false, true) }, null, default);
+
+    // Double-sided calendar export - creates 7 pages for folding
+    public Task<byte[]> ExportDoubleSidedAsync(CalendarProject project, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var pages = new List<DoubleSidedPageSpec>();
+
+        // Page 1 Front: June (0) photo + June (0) calendar
+        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, false));
+        // Page 1 Back: May (11) photo + July (1) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(11, 1, false, false, true));
+
+        // Page 2 Front: May (11) photo + July (1) calendar
+        pages.Add(new DoubleSidedPageSpec(11, 1, false, false, false));
+        // Page 2 Back: April (10) photo + August (2) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(10, 2, false, false, true));
+
+        // Page 3 Front: April (10) photo + August (2) calendar
+        pages.Add(new DoubleSidedPageSpec(10, 2, false, false, false));
+        // Page 3 Back: March (9) photo + September (3) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(9, 3, false, false, true));
+
+        // Page 4 Front: March (9) photo + September (3) calendar
+        pages.Add(new DoubleSidedPageSpec(9, 3, false, false, false));
+        // Page 4 Back: Feb (8) photo + October (4) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(8, 4, false, false, true));
+
+        // Page 5 Front: Feb (8) photo + October (4) calendar
+        pages.Add(new DoubleSidedPageSpec(8, 4, false, false, false));
+        // Page 5 Back: January (7) photo + November (5) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(7, 5, false, false, true));
+
+        // Page 6 Front: January (7) photo + November (5) calendar
+        pages.Add(new DoubleSidedPageSpec(7, 5, false, false, false));
+        // Page 6 Back: Dec prev year (6) photo + Dec current (6) calendar (upside down)
+        pages.Add(new DoubleSidedPageSpec(6, 6, true, false, true));
+
+        // Page 7 Front: Dec prev year (6) photo + Dec current (6) calendar
+        pages.Add(new DoubleSidedPageSpec(6, 6, true, false, false));
+        // Page 7 Back: Covers page (front upside down on top, back normal on bottom)
+        pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true));
+
+        return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
+    }
+
+    private record DoubleSidedPageSpec(int PhotoMonthIndex, int CalendarMonthIndex, bool UsePreviousYearPhoto, bool IsCoversPage, bool Rotated);
+
+    private Task<byte[]> RenderDoubleSidedDocumentAsync(CalendarProject project, List<DoubleSidedPageSpec> pages, IProgress<ExportProgress>? progress, CancellationToken cancellationToken)
+    {
+        return Task.Run(async () =>
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            var (wPtD, hPtD) = CalendarMaker_MAUI.Models.PageSizes.GetPoints(project.PageSpec);
+            float pageWpt = (float)wPtD;
+            float pageHpt = (float)hPtD;
+            if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
+
+            var totalPages = pages.Count;
+            var imageCache = new System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>();
+            int completedPages = 0;
+            var progressLock = new object();
+
+            try
+            {
+                var renderedPages = new byte[totalPages][];
+                int maxParallelism = GetOptimalParallelism();
+
+                Parallel.For(0, totalPages, new ParallelOptions
+                {
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = maxParallelism
+                },
+                pageIndex =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var pageSpec = pages[pageIndex];
+                    renderedPages[pageIndex] = RenderDoubleSidedPageToJpeg(project, pageSpec, pageWpt, pageHpt, TargetDpi, imageCache);
+
+                    int currentCompleted;
+                    lock (progressLock)
+                    {
+                        completedPages++;
+                        currentCompleted = completedPages;
+                    }
+
+                    if (progress != null)
+                    {
+                        var pageName = pageSpec.IsCoversPage ? "Covers Page" :
+                            $"Page {(pageIndex / 2) + 1} - {(pageSpec.Rotated ? "Back" : "Front")}";
+                        progress.Report(new ExportProgress
+                        {
+                            CurrentPage = currentCompleted,
+                            TotalPages = totalPages,
+                            Status = $"Rendering {pageName}... ({currentCompleted}/{totalPages})"
+                        });
+                    }
+                });
+
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
+                    Status = "All pages rendered, creating PDF..."
+                });
+
+                if (progress != null)
+                {
+                    await Task.Delay(100, cancellationToken);
+                }
+
+                var doc = Document.Create(container =>
+                {
+                    for (int i = 0; i < totalPages; i++)
+                    {
+                        var imgBytes = renderedPages[i];
+                        container.Page(page =>
+                        {
+                            page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
+                            page.Margin(0);
+                            page.DefaultTextStyle(x => x.FontSize(12));
+                            page.Content().Image(imgBytes).FitArea();
+                        });
+                    }
+                });
+
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
+                    Status = "Generating PDF file..."
+                });
+
+                using var stream = new MemoryStream();
+                doc.GeneratePdf(stream);
+
+                if (progress != null)
+                {
+                    await Task.Delay(50, cancellationToken);
+                }
+
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
+                    Status = "Export complete!"
+                });
+
+                return stream.ToArray();
+            }
+            finally
+            {
+                foreach (var bmp in imageCache.Values)
+                {
+                    bmp?.Dispose();
+                }
+                imageCache.Clear();
+            }
+        }, cancellationToken);
+    }
+
+    private byte[] RenderDoubleSidedPageToJpeg(CalendarProject project, DoubleSidedPageSpec pageSpec, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
+    {
+        float scale = targetDpi / 72f;
+        int widthPx = Math.Max(1, (int)Math.Round(pageWpt * scale));
+        int heightPx = Math.Max(1, (int)Math.Round(pageHpt * scale));
+
+        using var skSurface = SKSurface.Create(new SKImageInfo(widthPx, heightPx, SKColorType.Bgra8888, SKAlphaType.Premul));
+        var sk = skSurface.Canvas;
+        sk.Clear(SKColors.White);
+        sk.Scale(scale);
+
+        // Rotate 180 degrees for upside-down pages
+        if (pageSpec.Rotated)
+        {
+            sk.Translate(pageWpt, pageHpt);
+            sk.RotateDegrees(180);
+        }
+
+        var m = project.Margins;
+        var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
+
+        if (pageSpec.IsCoversPage)
+        {
+            // Page 7 back: Front cover (upside down) on top half, Back cover (normal) on bottom half
+            var topHalf = new SKRect(contentRect.Left, contentRect.Top, contentRect.Right, contentRect.MidY - 2f);
+            var bottomHalf = new SKRect(contentRect.Left, contentRect.MidY + 2f, contentRect.Right, contentRect.Bottom);
+
+            // Draw front cover upside down in top half
+            sk.Save();
+            sk.Translate(topHalf.MidX, topHalf.MidY);
+            sk.RotateDegrees(180);
+            sk.Translate(-topHalf.MidX, -topHalf.MidY);
+
+            var frontLayout = project.FrontCoverPhotoLayout;
+            var frontSlots = ComputePhotoSlots(topHalf, frontLayout);
+            foreach (var (rect, slotIndex) in frontSlots.Select((r, i) => (r, i)))
+            {
+                sk.Save();
+                sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
+            }
+            sk.Restore();
+
+            // Draw back cover normal in bottom half
+            var backLayout = project.BackCoverPhotoLayout;
+            var backSlots = ComputePhotoSlots(bottomHalf, backLayout);
+            foreach (var (rect, slotIndex) in backSlots.Select((r, i) => (r, i)))
+            {
+                sk.Save();
+                sk.ClipRect(rect, antialias: true);
+                var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
+            }
+        }
+        else
+        {
+            // Regular page: photo on one side, calendar on the other
+            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+
+            // Get photo layout for the photo month
+            var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
+                ? perMonth
+                : project.LayoutSpec.PhotoLayout;
+
+            // Draw photos
+            var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
+            foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
+            {
+                sk.Save();
+                sk.ClipRect(rect, antialias: true);
+
+                var photoMonthIndex = pageSpec.PhotoMonthIndex;
+                var asset = project.ImageAssets
+                    .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
+                    .OrderBy(a => a.Order)
+                    .FirstOrDefault();
+
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
+            }
+
+            // Draw calendar for the calendar month
+            DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex);
+        }
+
+        sk.Flush();
+        using var snapshot = skSurface.Snapshot();
+        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 85);
+        return data.ToArray();
+    }
 
     public Task<byte[]> ExportYearAsync(CalendarProject project, bool includeCover = true, IProgress<ExportProgress>? progress = null, CancellationToken cancellationToken = default)
     {

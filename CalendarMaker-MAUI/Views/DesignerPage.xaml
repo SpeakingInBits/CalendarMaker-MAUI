@@ -97,6 +97,7 @@
                 <Button Text="Export Month (PDF)" x:Name="ExportBtn" />
                 <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" />
                 <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" />
+                <Button Text="Export Double-Sided (PDF)" x:Name="ExportDoubleSidedBtn" />
                 <Button Text="Back" x:Name="BackBtn" />
             </VerticalStackLayout>
         </ScrollView>

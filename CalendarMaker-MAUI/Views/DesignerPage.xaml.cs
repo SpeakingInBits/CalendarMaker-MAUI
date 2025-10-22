@@ -65,6 +65,7 @@ public partial class DesignerPage : ContentPage
         ExportBtn.Clicked += OnExportClicked;
         ExportCoverBtn.Clicked += OnExportCoverClicked;
         ExportYearBtn.Clicked += OnExportYearClicked;
+        ExportDoubleSidedBtn.Clicked += OnExportDoubleSidedClicked;
 
         FlipBtn.Clicked += (_, __) => FlipLayout();
         BorderlessCheckBox.CheckedChanged += OnBorderlessChanged;
@@ -486,54 +487,113 @@ public partial class DesignerPage : ContentPage
         var progressModal = new ExportProgressModal();
         progressModal.SetCancellationTokenSource(cts);
         
-        var progress = new Progress<Services.ExportProgress>(p => progressModal.UpdateProgress(p));
+   var progress = new Progress<Services.ExportProgress>(p => progressModal.UpdateProgress(p));
 
-        bool exportCompleted = false;
+ bool exportCompleted = false;
         byte[]? exportedBytes = null;
         Exception? exportException = null;
 
-        progressModal.Cancelled += async (_, __) =>
+ progressModal.Cancelled += async (_, __) =>
         {
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+    try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+        };
+
+        await Shell.Current.Navigation.PushModalAsync(progressModal, true);
+
+  _ = Task.Run(async () =>
+        {
+         try
+    {
+    exportedBytes = await _pdf.ExportYearAsync(_project, includeCover: true, progress, cts.Token);
+        exportCompleted = true;
+ }
+        catch (OperationCanceledException)
+       {
+     await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+   try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+                await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+         });
+  return;
+       }
+ catch (Exception ex)
+      {
+            exportException = ex;
+            }
+
+         await MainThread.InvokeOnMainThreadAsync(async () =>
+      {
+       try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+
+   if (exportException != null)
+           {
+        await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+        }
+         else if (exportCompleted && exportedBytes != null)
+   {
+        var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
+      await SaveBytesAsync(fileName, exportedBytes);
+  }
+        });
+        });
+    }
+
+    private async void OnExportDoubleSidedClicked(object? sender, EventArgs e)
+    {
+      if (_project == null) return;
+
+        var cts = new CancellationTokenSource();
+var progressModal = new ExportProgressModal();
+        progressModal.SetCancellationTokenSource(cts);
+        
+        var progress = new Progress<Services.ExportProgress>(p => progressModal.UpdateProgress(p));
+
+        bool exportCompleted = false;
+  byte[]? exportedBytes = null;
+        Exception? exportException = null;
+
+        progressModal.Cancelled += async (_, __) =>
+  {
+         try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
         };
 
         await Shell.Current.Navigation.PushModalAsync(progressModal, true);
 
         _ = Task.Run(async () =>
-        {
-            try
+   {
+          try
             {
-                exportedBytes = await _pdf.ExportYearAsync(_project, includeCover: true, progress, cts.Token);
-                exportCompleted = true;
+         exportedBytes = await _pdf.ExportDoubleSidedAsync(_project, progress, cts.Token);
+             exportCompleted = true;
             }
-            catch (OperationCanceledException)
-            {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-                    await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
-                });
-                return;
+ catch (OperationCanceledException)
+{
+       await MainThread.InvokeOnMainThreadAsync(async () =>
+   {
+            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+         await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+             });
+      return;
             }
             catch (Exception ex)
-            {
-                exportException = ex;
+          {
+ exportException = ex;
             }
 
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-            {
-                try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+         await MainThread.InvokeOnMainThreadAsync(async () =>
+    {
+ try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
 
-                if (exportException != null)
-                {
-                    await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
-                }
+          if (exportException != null)
+          {
+      await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+ }
                 else if (exportCompleted && exportedBytes != null)
-                {
-                    var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
-                    await SaveBytesAsync(fileName, exportedBytes);
-                }
-            });
+   {
+            var fileName = $"Calendar_{_project.Year}_DoubleSided.pdf";
+             await SaveBytesAsync(fileName, exportedBytes);
+            }
+         });
         });
     }
 
