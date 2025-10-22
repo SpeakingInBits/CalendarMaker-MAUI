@@ -25,6 +25,9 @@ public sealed class CalendarProject
     public PhotoLayout FrontCoverPhotoLayout { get; set; } = PhotoLayout.Single;
     public PhotoLayout BackCoverPhotoLayout { get; set; } = PhotoLayout.Single;
 
+    // Enable double-sided calendar format (includes previous month's December)
+    public bool EnableDoubleSided { get; set; } = false;
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 

@@ -91,6 +91,11 @@
                     <Label Text="First Day of Week" />
                     <Picker x:Name="FirstDowPicker" Grid.Column="1"/>
                 </Grid>
+                <!-- Double-sided calendar toggle -->
+                <HorizontalStackLayout Spacing="6">
+                    <CheckBox x:Name="DoubleSidedCheckBox" VerticalOptions="Center" />
+                    <Label Text="Double-Sided Calendar" VerticalOptions="Center" />
+                </HorizontalStackLayout>
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Export" FontAttributes="Bold" />

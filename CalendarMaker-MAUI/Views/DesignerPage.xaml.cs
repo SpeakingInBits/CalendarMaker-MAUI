@@ -74,6 +74,7 @@ public partial class DesignerPage : ContentPage
         YearEntry.TextChanged += OnYearChanged;
         StartMonthPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.StartMonth = StartMonthPicker.SelectedIndex + 1; _pageIndex = -1; _activeSlotIndex = 0; SyncZoomUI(); UpdatePageLabel(); _ = _storage.UpdateProjectAsync(_project); _canvas.InvalidateSurface(); } };
         FirstDowPicker.SelectedIndexChanged += (_, __) => { if (_project != null) { _project.FirstDayOfWeek = (DayOfWeek)FirstDowPicker.SelectedIndex; _ = _storage.UpdateProjectAsync(_project); } _canvas.InvalidateSurface(); };
+        DoubleSidedCheckBox.CheckedChanged += OnDoubleSidedChanged;
 
         _pageIndex = -1; // start with front cover
         PopulateStaticPickers();
@@ -82,14 +83,18 @@ public partial class DesignerPage : ContentPage
     private void NavigatePage(int direction)
     {
         _pageIndex += direction;
-        // Wrap around: -1 (front cover) to 12 (back cover) = 14 total pages
-        if (_pageIndex < -1) _pageIndex = 12;
-        if (_pageIndex > 12) _pageIndex = -1;
+        // Determine page range based on double-sided mode
+        // Double-sided: -2 (prev Dec) to 12 (back cover) = 15 pages
+  // Normal: -1 (front cover) to 12 (back cover) = 14 pages
+        int minPage = _project?.EnableDoubleSided == true ? -2 : -1;
+        
+        if (_pageIndex < minPage) _pageIndex = 12;
+ if (_pageIndex > 12) _pageIndex = minPage;
         
         _activeSlotIndex = 0;
         SyncZoomUI();
-        UpdatePageLabel();
-        _canvas.InvalidateSurface();
+   UpdatePageLabel();
+ _canvas.InvalidateSurface();
     }
 
     private async Task ImportPhotosToProjectAsync()
@@ -266,7 +271,14 @@ public partial class DesignerPage : ContentPage
     {
         if (_project == null) { MonthLabel.Text = string.Empty; return; }
         
-        if (_pageIndex == -1)
+        if (_pageIndex == -2)
+        {
+            // Previous year's December (only in double-sided mode)
+            var prevYear = _project.Year - 1;
+            MonthLabel.Text = $"December {prevYear} (Prev Year)";
+            SyncPhotoLayoutPicker();
+        }
+        else if (_pageIndex == -1)
         {
             MonthLabel.Text = "Front Cover";
             SyncPhotoLayoutPicker();
@@ -289,22 +301,23 @@ public partial class DesignerPage : ContentPage
     
     private void UpdateSplitControlVisibility()
     {
-        // Hide split control for cover pages (front cover: -1, back cover: 12)
-        bool isCoverPage = _pageIndex == -1 || _pageIndex == 12;
-        SplitControlGrid.IsVisible = !isCoverPage;
+        // Hide split control for cover pages and previous December
+  bool isCoverOrPrevDec = _pageIndex == -2 || _pageIndex == -1 || _pageIndex == 12;
+   SplitControlGrid.IsVisible = !isCoverOrPrevDec;
         
         // Show borderless option only on cover pages
-        BorderlessControl.IsVisible = isCoverPage;
+        bool isCoverPage = _pageIndex == -1 || _pageIndex == 12;
+      BorderlessControl.IsVisible = isCoverPage;
         
         // Sync borderless checkbox state
         if (_project != null && isCoverPage)
         {
-            BorderlessCheckBox.CheckedChanged -= OnBorderlessChanged; // Temporarily remove handler
-            BorderlessCheckBox.IsChecked = _pageIndex == -1 
-                ? _project.CoverSpec.BorderlessFrontCover 
-                : _project.CoverSpec.BorderlessBackCover;
-            BorderlessCheckBox.CheckedChanged += OnBorderlessChanged; // Re-add handler
-        }
+      BorderlessCheckBox.CheckedChanged -= OnBorderlessChanged; // Temporarily remove handler
+      BorderlessCheckBox.IsChecked = _pageIndex == -1 
+             ? _project.CoverSpec.BorderlessFrontCover 
+    : _project.CoverSpec.BorderlessBackCover;
+     BorderlessCheckBox.CheckedChanged += OnBorderlessChanged; // Re-add handler
+     }
     }
     
     private void OnBorderlessChanged(object? sender, CheckedChangedEventArgs e)
@@ -316,12 +329,29 @@ public partial class DesignerPage : ContentPage
             _project.CoverSpec.BorderlessFrontCover = e.Value;
         }
         else if (_pageIndex == 12)
-        {
-            _project.CoverSpec.BorderlessBackCover = e.Value;
+      {
+      _project.CoverSpec.BorderlessBackCover = e.Value;
         }
         
         _ = _storage.UpdateProjectAsync(_project);
         _canvas.InvalidateSurface();
+  }
+
+    private void OnDoubleSidedChanged(object? sender, CheckedChangedEventArgs e)
+    {
+ if (_project == null) return;
+        
+        _project.EnableDoubleSided = e.Value;
+     _ = _storage.UpdateProjectAsync(_project);
+        
+        // Reset to front cover if we were on the previous December page and toggled off
+  if (!e.Value && _pageIndex == -2)
+        {
+  _pageIndex = -1;
+      }
+        
+        UpdatePageLabel();
+    _canvas.InvalidateSurface();
     }
 
     private void SyncPhotoLayoutPicker()
@@ -612,20 +642,21 @@ var progressModal = new ExportProgressModal();
         if (_project != null) return;
         if (string.IsNullOrEmpty(ProjectId)) return;
         var projects = await _storage.GetProjectsAsync();
-        _project = projects.FirstOrDefault(p => p.Id == ProjectId);
-        if (_project != null)
-        {
-            SplitSlider.Value = _project.LayoutSpec.SplitRatio;
-            SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
-            YearEntry.Text = _project.Year.ToString();
-            StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
-            FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
+       _project = projects.FirstOrDefault(p => p.Id == ProjectId);
+    if (_project != null)
+{
+SplitSlider.Value = _project.LayoutSpec.SplitRatio;
+   SplitValueLabel.Text = _project.LayoutSpec.SplitRatio.ToString("P0");
+      YearEntry.Text = _project.Year.ToString();
+       StartMonthPicker.SelectedIndex = Math.Clamp(_project.StartMonth - 1, 0, 11);
+       FirstDowPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
+ DoubleSidedCheckBox.IsChecked = _project.EnableDoubleSided;
             _activeSlotIndex = 0;
-            SyncPhotoLayoutPicker();
-            SyncZoomUI();
-            UpdatePageLabel();
-            _canvas.InvalidateSurface();
-        }
+    SyncPhotoLayoutPicker();
+         SyncZoomUI();
+UpdatePageLabel();
+     _canvas.InvalidateSurface();
+  }
     }
 
     protected override void OnAppearing()
@@ -740,7 +771,26 @@ var progressModal = new ExportProgressModal();
             System.Diagnostics.Debug.WriteLine($"Front Cover: Layout={layout}, Slots={_lastPhotoSlots.Count}, ActiveSlot={_activeSlotIndex}");
             DrawCover(canvas, contentRect, _project, true);
         }
-        else if (_pageIndex == 12) // Back cover
+        else if (_pageIndex == -2) // Previous December (only in double-sided mode)
+        {
+            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
+            
+  // Month index 6 represents December when StartMonth is January (0-based from StartMonth)
+       // For previous year's December, we use index 6 but with previous year
+        int decemberIndex = (_project.StartMonth == 1) ? 11 : (12 - _project.StartMonth);
+            
+       var layout = _project.MonthPhotoLayouts.TryGetValue(decemberIndex, out var perMonth)
+                ? perMonth
+      : _project.LayoutSpec.PhotoLayout;
+        
+     _lastPhotoRect = photoRect;
+       _lastPhotoSlots = ComputePhotoSlots(photoRect, layout, false);
+            DrawPhotos(canvas, _lastPhotoSlots);
+
+     // Draw calendar for previous year's December
+  DrawPreviousDecemberCalendar(canvas, calRect, _project);
+  }
+   else if (_pageIndex == 12) // Back cover
         {
             var layout = _project.BackCoverPhotoLayout;
             _lastPhotoSlots = ComputePhotoSlots(contentRect, layout, true);
@@ -1091,23 +1141,23 @@ var progressModal = new ExportProgressModal();
         float Stroke1px() => 1f / Math.Max(_pageScale, 0.0001f);
         float Snap(float v) => (float)Math.Round(v * _pageScale) / Math.Max(_pageScale, 0.0001f);
 
-        var month = ((project.StartMonth - 1 + _pageIndex) % 12) + 1;
+   var month = ((project.StartMonth - 1 + _pageIndex) % 12) + 1;
         var year = project.Year + (project.StartMonth - 1 + _pageIndex) / 12;
         var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
-        float headerH = 40;
+    float headerH = 40;
         var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
-        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
+    using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
         var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        var titleWidth = titlePaint.MeasureText(title);
+      var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
-        float dowH = 20;
+   float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
-        string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-        int shift = (int)project.FirstDayOfWeek;
+     string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+      int shift = (int)project.FirstDayOfWeek;
         var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
         using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = Stroke1px(), IsAntialias = false };
@@ -1116,49 +1166,49 @@ var progressModal = new ExportProgressModal();
         float colW = dowRect.Width / 7f;
         for (int c = 0; c < 7; c++)
         {
-            var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+      var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
             var t = displayDows[c];
-            var tw = textPaint.MeasureText(t);
-            canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            var x0 = Snap(cell.Left);
-            var x1 = Snap(cell.Right);
-            var y0 = Snap(cell.Top);
+       var tw = textPaint.MeasureText(t);
+ canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
+        var x0 = Snap(cell.Left);
+        var x1 = Snap(cell.Right);
+  var y0 = Snap(cell.Top);
             var y1 = Snap(cell.Bottom);
             canvas.DrawLine(x0, y0, x1, y0, gridPen);
             canvas.DrawLine(x0, y1, x1, y1, gridPen);
-            canvas.DrawLine(x0, y0, x0, y1, gridPen);
+          canvas.DrawLine(x0, y0, x0, y1, gridPen);
             if (c == 6)
-                canvas.DrawLine(x1, y0, x1, y1, gridPen);
+       canvas.DrawLine(x1, y0, x1, y1, gridPen);
         }
 
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         if (rows <= 0)
         {
-            var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
-            var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
+        var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
+          var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
             canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
-            return;
+     return;
         }
 
-        float rowH = weeksArea.Height / rows;
+  float rowH = weeksArea.Height / rows;
 
-        for (int r = 0; r < rows; r++)
+    for (int r = 0; r < rows; r++)
         {
-            for (int c = 0; c < 7; c++)
+     for (int c = 0; c < 7; c++)
             {
-                var left = weeksArea.Left + c * colW;
-                var top = weeksArea.Top + r * rowH;
-                var right = weeksArea.Left + (c + 1) * colW;
-                var bottom = weeksArea.Top + (r + 1) * rowH;
-                var cell = new SKRect(left, top, right, bottom);
+        var left = weeksArea.Left + c * colW;
+      var top = weeksArea.Top + r * rowH;
+  var right = weeksArea.Left + (c + 1) * colW;
+     var bottom = weeksArea.Top + (r + 1) * rowH;
+       var cell = new SKRect(left, top, right, bottom);
 
-                var date = weeks[r][c];
-                if (date.HasValue && date.Value.Month == month)
-                {
-                    var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
-                    canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-                }
+      var date = weeks[r][c];
+         if (date.HasValue && date.Value.Month == month)
+       {
+         var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+        canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+    }
             }
         }
 
@@ -1170,13 +1220,109 @@ var progressModal = new ExportProgressModal();
         for (int c = 0; c <= 7; c++)
         {
             var x = Snap(weeksArea.Left + c * colW);
-            canvas.DrawLine(x, wy0, x, wy1, gridPen);
-        }
-        for (int r = 0; r <= rows; r++)
+   canvas.DrawLine(x, wy0, x, wy1, gridPen);
+  }
+  for (int r = 0; r <= rows; r++)
         {
-            var y = Snap(weeksArea.Top + r * rowH);
-            canvas.DrawLine(wx0, y, wx1, y, gridPen);
+        var y = Snap(weeksArea.Top + r * rowH);
+      canvas.DrawLine(wx0, y, wx1, y, gridPen);
+     }
+
+        canvas.DrawRect(new SKRect(wx0, wy0, wx1, wy1), gridPen);
+    }
+
+    private void DrawPreviousDecemberCalendar(SKCanvas canvas, SKRect bounds, CalendarProject project)
+    {
+        float Stroke1px() => 1f / Math.Max(_pageScale, 0.0001f);
+        float Snap(float v) => (float)Math.Round(v * _pageScale) / Math.Max(_pageScale, 0.0001f);
+
+      // Previous year's December
+  int year = project.Year - 1;
+        int month = 12;
+        var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
+
+   float headerH = 40;
+        var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
+        var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
+
+        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
+   var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+var titleWidth = titlePaint.MeasureText(title);
+     canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
+
+float dowH = 20;
+        var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
+        string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+   int shift = (int)project.FirstDayOfWeek;
+        var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
+
+        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = Stroke1px(), IsAntialias = false };
+        using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
+
+        float colW = dowRect.Width / 7f;
+      for (int c = 0; c < 7; c++)
+     {
+     var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+  var t = displayDows[c];
+        var tw = textPaint.MeasureText(t);
+            canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
+            var x0 = Snap(cell.Left);
+            var x1 = Snap(cell.Right);
+            var y0 = Snap(cell.Top);
+       var y1 = Snap(cell.Bottom);
+            canvas.DrawLine(x0, y0, x1, y0, gridPen);
+            canvas.DrawLine(x0, y1, x1, y1, gridPen);
+          canvas.DrawLine(x0, y0, x0, y1, gridPen);
+            if (c == 6)
+     canvas.DrawLine(x1, y0, x1, y1, gridPen);
         }
+
+        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
+   int rows = weeks.Count;
+  if (rows <= 0)
+        {
+        var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
+   var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
+            canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
+            return;
+        }
+
+  float rowH = weeksArea.Height / rows;
+
+      for (int r = 0; r < rows; r++)
+     {
+            for (int c = 0; c < 7; c++)
+         {
+                var left = weeksArea.Left + c * colW;
+      var top = weeksArea.Top + r * rowH;
+ var right = weeksArea.Left + (c + 1) * colW;
+            var bottom = weeksArea.Top + (r + 1) * rowH;
+var cell = new SKRect(left, top, right, bottom);
+
+             var date = weeks[r][c];
+        if (date.HasValue && date.Value.Month == month)
+ {
+        var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+  canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+     }
+       }
+        }
+
+        var wx0 = Snap(weeksArea.Left);
+        var wx1 = Snap(weeksArea.Right);
+      var wy0 = Snap(weeksArea.Top);
+        var wy1 = Snap(weeksArea.Bottom);
+
+     for (int c = 0; c <= 7; c++)
+  {
+     var x = Snap(weeksArea.Left + c * colW);
+       canvas.DrawLine(x, wy0, x, wy1, gridPen);
+        }
+      for (int r = 0; r <= rows; r++)
+    {
+      var y = Snap(weeksArea.Top + r * rowH);
+            canvas.DrawLine(wx0, y, wx1, y, gridPen);
+     }
 
         canvas.DrawRect(new SKRect(wx0, wy0, wx1, wy1), gridPen);
     }
@@ -1184,13 +1330,13 @@ var progressModal = new ExportProgressModal();
     private void OnSplitResetTapped(object? sender, TappedEventArgs e)
     {
         if (_project != null)
-        {
+      {
             _project.LayoutSpec.SplitRatio = 0.5;
-            SplitSlider.Value = 0.5;
+  SplitSlider.Value = 0.5;
             SplitValueLabel.Text = "50%";
             _ = _storage.UpdateProjectAsync(_project);
-            _canvas.InvalidateSurface();
-        }
+      _canvas.InvalidateSurface();
+      }
     }
 
     private void OnZoomResetTapped(object? sender, TappedEventArgs e)
@@ -1199,11 +1345,11 @@ var progressModal = new ExportProgressModal();
         if (asset != null)
         {
             asset.Zoom = 1;
-            asset.PanX = asset.PanY = 0;
-            ZoomSlider.Value = 1;
+       asset.PanX = asset.PanY = 0;
+    ZoomSlider.Value = 1;
             ZoomValueLabel.Text = "1.00x";
             _ = _storage.UpdateProjectAsync(_project!);
-            _canvas.InvalidateSurface();
+      _canvas.InvalidateSurface();
         }
     }
 }
