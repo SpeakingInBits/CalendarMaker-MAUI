@@ -42,56 +42,59 @@ public sealed class PdfExportService : IPdfExportService
     {
         var pages = new List<DoubleSidedPageSpec>();
 
-      // Check if we need to include previous December
-      bool includePreviousDecember = project.EnableDoubleSided;
+        // Check if we need to include previous December
+        bool includePreviousDecember = project.EnableDoubleSided;
         
-     // Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
+// Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
    // Even pages are rotated 180 degrees for proper double-sided printing
-      // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
-      
- // Page 1: June photo and June month (normal)
-        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, false, false));
+        // Months are relative to StartMonth (0-11), so month 6 is the 7th month in the calendar year
+        // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
+        
+        // Page 1: Month 6 (normal)
+        pages.Add(new DoubleSidedPageSpec(6, 6, false, false, false, false));
     
-        // Page 2: July photo and May month (rotated 180°)
-     pages.Add(new DoubleSidedPageSpec(1, 11, false, false, true, false));
+        // Page 2: Month 5 (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(5, 5, false, false, true, false));
      
-        // Page 3: May photo and July month (normal)
-  pages.Add(new DoubleSidedPageSpec(11, 1, false, false, false, false));
+  // Page 3: Month 7 (normal)
+ pages.Add(new DoubleSidedPageSpec(7, 7, false, false, false, false));
  
-   // Page 4: August photo and April month (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(2, 10, false, false, true, false));
+ // Page 4: Month 4 (rotated 180°)
+pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
   
-        // Page 5: April photo and August month (normal)
-        pages.Add(new DoubleSidedPageSpec(10, 2, false, false, false, false));
+        // Page 5: Month 8 (normal)
+    pages.Add(new DoubleSidedPageSpec(8, 8, false, false, false, false));
   
-        // Page 6: September photo and March month (rotated 180°)
- pages.Add(new DoubleSidedPageSpec(3, 9, false, false, true, false));
+        // Page 6: Month 3 (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(3, 3, false, false, true, false));
   
-      // Page 7: March photo and September month (normal)
-        pages.Add(new DoubleSidedPageSpec(9, 3, false, false, false, false));
+  // Page 7: Month 9 (normal)
+        pages.Add(new DoubleSidedPageSpec(9, 9, false, false, false, false));
   
-     // Page 8: October photo and Feb month (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(4, 8, false, false, true, false));
+        // Page 8: Month 2 (rotated 180°)
+      pages.Add(new DoubleSidedPageSpec(2, 2, false, false, true, false));
         
-        // Page 9: Feb photo and October month (normal)
-        pages.Add(new DoubleSidedPageSpec(8, 4, false, false, false, false));
+  // Page 9: Month 10 (normal)
+   pages.Add(new DoubleSidedPageSpec(10, 10, false, false, false, false));
    
-        // Page 10: November photo and Jan month (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(5, 7, false, false, true, false));
+        // Page 10: Month 1 (rotated 180°)
+   pages.Add(new DoubleSidedPageSpec(1, 1, false, false, true, false));
      
-        // Page 11: Jan photo and November month (normal)
-        pages.Add(new DoubleSidedPageSpec(7, 5, false, false, false, false));
-        
-        // Page 12: December curr year photo and Dec prev year month (rotated 180°)
-    pages.Add(new DoubleSidedPageSpec(6, 6, includePreviousDecember, false, true, false));
+        // Page 11: Month 11 (normal)
+        pages.Add(new DoubleSidedPageSpec(11, 11, false, false, false, false));
+
+        // Page 12: Month -1 (Previous December) (rotated 180°)
+        // When includePreviousDecember is true, this shows previous year's December
+        // The UsePreviousYearPhoto flag tells the renderer to look for photos with MonthIndex = -2
+        pages.Add(new DoubleSidedPageSpec(-1, -1, includePreviousDecember, false, true, false));
     
-        // Page 13: Dec prev year photo and December curr year month (normal)
-        pages.Add(new DoubleSidedPageSpec(6, 6, includePreviousDecember, false, false, false));
+  // Page 13: Month 12 (December of current year) (normal)
+        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, false, false));
   
-    // Page 14: Front cover and rear cover (split page, rotated 180°)
+        // Page 14: Front cover and rear cover (split page, rotated 180°)
         pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true, false));
 
-   return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
+     return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
     }
 
     private record DoubleSidedPageSpec(int PhotoMonthIndex, int CalendarMonthIndex, bool UsePreviousYearPhoto, bool IsCoversPage, bool Rotated, bool SwapPhotoAndCalendar);
@@ -290,42 +293,42 @@ public sealed class PdfExportService : IPdfExportService
 
             // Draw photos
             var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
-            foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
-            {
-            sk.Save();
-          sk.ClipRect(rect, antialias: true);
+ foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
+          {
+   sk.Save();
+    sk.ClipRect(rect, antialias: true);
 
      var photoMonthIndex = pageSpec.PhotoMonthIndex;
 
-     // When UsePreviousYearPhoto is true and we're looking for December (month 6 in 0-indexed from start),
-     // we need to find photos assigned to the "previous December" page (index -2 in designer)
-    // These are stored with MonthIndex = -2 in the designer
-
-    ImageAsset? asset = null;
-            if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == 6)
+        // Handle previous December (month index -1)
+   // When UsePreviousYearPhoto is true, we look for photos assigned to page -2 in designer
+     // These are stored with MonthIndex = -2
+  
+          ImageAsset? asset = null;
+   if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == -1)
     {
-     // Look for photos assigned to previous year's December
-     // These are stored with MonthIndex = -2 in the designer
-             asset = project.ImageAssets
-     .Where(a => a.Role == "monthPhoto" && a.MonthIndex == -2 && (a.SlotIndex ?? 0) == slotIndex)
+  // Look for photos assigned to previous year's December
+    // These are stored with MonthIndex = -2 in the designer
+          asset = project.ImageAssets
+       .Where(a => a.Role == "monthPhoto" && a.MonthIndex == -2 && (a.SlotIndex ?? 0) == slotIndex)
       .OrderBy(a => a.Order)
     .FirstOrDefault();
-     }
+ }
           else
-              {
-     asset = project.ImageAssets
-          .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
-  .OrderBy(a => a.Order)
-     .FirstOrDefault();
-  }
+          {
+  asset = project.ImageAssets
+    .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
+   .OrderBy(a => a.Order)
+            .FirstOrDefault();
+ }
 
    if (asset != null && File.Exists(asset.Path))
-        {
+     {
    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-    if (bmp != null)
-                DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+  if (bmp != null)
+   DrawBitmapWithPanZoom(sk, bmp, rect, asset);
     }
-         sk.Restore();
+   sk.Restore();
    }
 
  // Draw calendar for the calendar month
@@ -719,55 +722,68 @@ public sealed class PdfExportService : IPdfExportService
 
     private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex)
     {
-        var month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
-        var year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
-        var engine = new CalendarEngine();
-        var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
+        // Handle previous December (month index -1)
+        int month, year;
+        if (monthIndex == -1)
+      {
+            // Previous year's December
+          month = 12;
+            year = project.Year - 1;
+        }
+        else
+ {
+            // Normal month calculation
+  month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
+            year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
+        }
+ 
+var engine = new CalendarEngine();
+   var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
-        float headerH = 40;
-        var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
+  float headerH = 40;
+   var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
         var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        var titleWidth = titlePaint.MeasureText(title);
+      var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
         float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
-        string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-        int shift = (int)project.FirstDayOfWeek;
+      string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+      int shift = (int)project.FirstDayOfWeek;
         var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
-        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
-        using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
+      using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
+  using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
 
-        float colW = dowRect.Width / 7f;
+      float colW = dowRect.Width / 7f;
         for (int c = 0; c < 7; c++)
         {
-            var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+    var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
             var t = displayDows[c];
-            var tw = textPaint.MeasureText(t);
-            canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
+     var tw = textPaint.MeasureText(t);
+   canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
             canvas.DrawRect(cell, gridPen);
-        }
+    }
 
-        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
-        int rows = weeks.Count;
+      var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
+      int rows = weeks.Count;
         float rowH = weeksArea.Height / rows;
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < 7; c++)
-            {
-                var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-                canvas.DrawRect(cell, gridPen);
+     {
+            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
+          canvas.DrawRect(cell, gridPen);
                 var date = weeks[r][c];
                 if (date.HasValue && date.Value.Month == month)
-                {
-                    var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
-                    canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-                }
-            }
+         {
+     var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+ canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+}
+    }
         }
     }
 }
