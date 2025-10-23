@@ -739,26 +739,44 @@ UpdatePageLabel();
         canvas.DrawRect(pageRect, pageBorder);
 
         // Determine content rect based on page type and borderless settings
-        var m = _project.Margins;
+   var m = _project.Margins;
         SKRect contentRect;
         
         if (_pageIndex == -1 && _project.CoverSpec.BorderlessFrontCover)
         {
-            // Front cover with borderless - use full page
+         // Front cover with borderless - use full page
             contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
         }
         else if (_pageIndex == 12 && _project.CoverSpec.BorderlessBackCover)
         {
-            // Back cover with borderless - use full page
-            contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
+   // Back cover with borderless - use full page
+      contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
         }
         else
-        {
-            // Normal margins
-            contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
+    {
+     // Normal margins
+        contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, (float)pageWpt - (float)m.RightPt, (float)pageHpt - (float)m.BottomPt);
         }
         
-        _lastContentRect = contentRect;
+        // If double-sided mode is enabled, show covers at half-height
+        // This matches how they'll appear in the final PDF (Page 14)
+      if (_project.EnableDoubleSided && (_pageIndex == -1 || _pageIndex == 12))
+    {
+            // Use only the top half or bottom half for covers in double-sided mode
+            float halfHeight = contentRect.Height / 2f;
+      if (_pageIndex == -1)
+      {
+       // Front cover - bottom half (to match Page 14 layout)
+       contentRect = new SKRect(contentRect.Left, contentRect.MidY + 2f, contentRect.Right, contentRect.Bottom);
+          }
+     else // _pageIndex == 12
+       {
+           // Back cover - top half (to match Page 14 layout)
+    contentRect = new SKRect(contentRect.Left, contentRect.Top, contentRect.Right, contentRect.MidY - 2f);
+         }
+        }
+   
+    _lastContentRect = contentRect;
         
         // Only draw content border if not borderless
         bool isBorderless = (_pageIndex == -1 && _project.CoverSpec.BorderlessFrontCover) ||

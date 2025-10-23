@@ -238,49 +238,53 @@ public sealed class PdfExportService : IPdfExportService
 
         if (pageSpec.IsCoversPage)
         {
-            // Page 7 back: Front cover (upside down) on top half, Back cover (normal) on bottom half
+            // Page 14: Front and back covers using TwoHorizontalStack layout
+            // Top half: Back cover (rotated 180° because the whole page is already rotated)
+            // Bottom half: Front cover (normal, but appears upside down because whole page is rotated)
+        
+            // Split the content into two horizontal halves
             var topHalf = new SKRect(contentRect.Left, contentRect.Top, contentRect.Right, contentRect.MidY - 2f);
-            var bottomHalf = new SKRect(contentRect.Left, contentRect.MidY + 2f, contentRect.Right, contentRect.Bottom);
+         var bottomHalf = new SKRect(contentRect.Left, contentRect.MidY + 2f, contentRect.Right, contentRect.Bottom);
 
-            // Draw front cover upside down in top half
+            // Draw back cover in top half (rotated 180° within the already-rotated page)
             sk.Save();
             sk.Translate(topHalf.MidX, topHalf.MidY);
             sk.RotateDegrees(180);
-            sk.Translate(-topHalf.MidX, -topHalf.MidY);
+     sk.Translate(-topHalf.MidX, -topHalf.MidY);
 
-            var frontLayout = project.FrontCoverPhotoLayout;
-            var frontSlots = ComputePhotoSlots(topHalf, frontLayout);
-            foreach (var (rect, slotIndex) in frontSlots.Select((r, i) => (r, i)))
-            {
-                sk.Save();
-                sk.ClipRect(rect, antialias: true);
-                var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+ var backLayout = project.BackCoverPhotoLayout;
+ var backSlots = ComputePhotoSlots(topHalf, backLayout);
+   foreach (var (rect, slotIndex) in backSlots.Select((r, i) => (r, i)))
+      {
+     sk.Save();
+         sk.ClipRect(rect, antialias: true);
+          var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
-                {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-                    if (bmp != null)
-                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
-                }
-                sk.Restore();
-            }
-            sk.Restore();
+     {
+          var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+       if (bmp != null)
+          DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+ }
+        sk.Restore();
+       }
+       sk.Restore();
 
-            // Draw back cover normal in bottom half
-            var backLayout = project.BackCoverPhotoLayout;
-            var backSlots = ComputePhotoSlots(bottomHalf, backLayout);
-            foreach (var (rect, slotIndex) in backSlots.Select((r, i) => (r, i)))
+        // Draw front cover in bottom half (normal orientation within the already-rotated page)
+var frontLayout = project.FrontCoverPhotoLayout;
+            var frontSlots = ComputePhotoSlots(bottomHalf, frontLayout);
+         foreach (var (rect, slotIndex) in frontSlots.Select((r, i) => (r, i)))
             {
-                sk.Save();
-                sk.ClipRect(rect, antialias: true);
-                var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
-                if (asset != null && File.Exists(asset.Path))
+      sk.Save();
+             sk.ClipRect(rect, antialias: true);
+           var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
+            if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-                    if (bmp != null)
-                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
-                }
-                sk.Restore();
-            }
+          var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+     if (bmp != null)
+  DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+    }
+  sk.Restore();
+     }
         }
         else
         {
@@ -700,9 +704,9 @@ public sealed class PdfExportService : IPdfExportService
     {
         var imgW = (float)bmp.Width;
         var imgH = (float)bmp.Height;
-        var rectW = rect.Width;
+    var rectW = rect.Width;
         var rectH = rect.Height;
-        var imgAspect = imgW / imgH;
+      var imgAspect = imgW / imgH;
         var rectAspect = rectW / rectH;
 
         float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
@@ -710,11 +714,11 @@ public sealed class PdfExportService : IPdfExportService
         var targetW = imgW * scale; var targetH = imgH * scale;
         var excessX = Math.Max(0, (targetW - rectW) / 2f);
         var excessY = Math.Max(0, (targetH - rectH) / 2f);
-        var px = (float)Math.Clamp(asset.PanX, -1, 1);
+  var px = (float)Math.Clamp(asset.PanX, -1, 1);
         var py = (float)Math.Clamp(asset.PanY, -1, 1);
 
-        var left = rect.Left - excessX + px * excessX;
-        var top = rect.Top - excessY + py * excessY;
+  var left = rect.Left - excessX + px * excessX;
+var top = rect.Top - excessY + py * excessY;
         var dest = new SKRect(left, top, left + targetW, top + targetH);
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
