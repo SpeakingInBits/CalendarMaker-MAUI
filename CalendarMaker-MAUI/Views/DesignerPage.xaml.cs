@@ -347,7 +347,43 @@ await _storage.UpdateProjectAsync(_project);
     {
  if (_project == null) return;
         
-        _project.EnableDoubleSided = e.Value;
+     // If enabling double-sided mode and start month is not January, warn and change it
+        if (e.Value && _project.StartMonth != 1)
+        {
+          MainThread.BeginInvokeOnMainThread(async () =>
+       {
+                bool proceed = await this.DisplayAlert(
+    "Change Start Month?",
+       "Double-sided calendars require a January start month. Would you like to change the start month to January?",
+   "Yes, Change to January",
+      "Cancel");
+        
+           if (proceed)
+      {
+ _project.StartMonth = 1;
+StartMonthPicker.SelectedIndex = 0; // January is index 0
+_project.EnableDoubleSided = true;
+   await _storage.UpdateProjectAsync(_project);
+      
+   // Reset to front cover to show the change
+         _pageIndex = -1;
+     _activeSlotIndex = 0;
+  SyncZoomUI();
+       UpdatePageLabel();
+   _canvas.InvalidateSurface();
+        }
+ else
+   {
+          // User cancelled, revert the checkbox
+         DoubleSidedCheckBox.CheckedChanged -= OnDoubleSidedChanged;
+   DoubleSidedCheckBox.IsChecked = false;
+      DoubleSidedCheckBox.CheckedChanged += OnDoubleSidedChanged;
+         }
+     });
+ return;
+        }
+        
+ _project.EnableDoubleSided = e.Value;
      _ = _storage.UpdateProjectAsync(_project);
         
         // Reset to front cover if we were on the previous December page and toggled off
@@ -1241,15 +1277,15 @@ UpdatePageLabel();
         var wy0 = Snap(weeksArea.Top);
         var wy1 = Snap(weeksArea.Bottom);
 
-        for (int c = 0; c <= 7; c++)
-        {
-            var x = Snap(weeksArea.Left + c * colW);
-   canvas.DrawLine(x, wy0, x, wy1, gridPen);
-  }
-  for (int r = 0; r <= rows; r++)
-        {
-        var y = Snap(weeksArea.Top + r * rowH);
-      canvas.DrawLine(wx0, y, wx1, y, gridPen);
+     for (int c = 0; c <= 7; c++)
+  {
+     var x = Snap(weeksArea.Left + c * colW);
+       canvas.DrawLine(x, wy0, x, wy1, gridPen);
+        }
+      for (int r = 0; r <= rows; r++)
+    {
+      var y = Snap(weeksArea.Top + r * rowH);
+            canvas.DrawLine(wx0, y, wx1, y, gridPen);
      }
 
         canvas.DrawRect(new SKRect(wx0, wy0, wx1, wy1), gridPen);
