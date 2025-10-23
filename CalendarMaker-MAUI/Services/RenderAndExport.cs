@@ -44,57 +44,58 @@ public sealed class PdfExportService : IPdfExportService
 
         // Check if we need to include previous December
         bool includePreviousDecember = project.EnableDoubleSided;
-        
-// Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
-   // Even pages are rotated 180 degrees for proper double-sided printing
-        // Months are relative to StartMonth (0-11), so month 6 is the 7th month in the calendar year
+
+        // Page ordering for double-sided calendar (14 pages total, 7 physical sheets)
+        // Even pages are rotated 180 degrees for proper double-sided printing
+        // Month indices are 0-based relative to StartMonth
+        // For a January start: Month 0=Jan, Month 5=June, Month 11=December
         // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
-        
-        // Page 1: Month 6 (normal)
-        pages.Add(new DoubleSidedPageSpec(6, 6, false, false, false, false));
-    
-        // Page 2: Month 5 (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(5, 5, false, false, true, false));
-     
-  // Page 3: Month 7 (normal)
- pages.Add(new DoubleSidedPageSpec(7, 7, false, false, false, false));
- 
- // Page 4: Month 4 (rotated 180°)
-pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
-  
-        // Page 5: Month 8 (normal)
-    pages.Add(new DoubleSidedPageSpec(8, 8, false, false, false, false));
-  
-        // Page 6: Month 3 (rotated 180°)
+
+        // Page 1: Month 5 (June when StartMonth=1)
+        pages.Add(new DoubleSidedPageSpec(5, 5, false, false, false, false));
+
+        // Page 2: Month 4 (May when StartMonth=1) (rotated 180°)
+     pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
+
+     // Page 3: Month 6 (July when StartMonth=1)
+      pages.Add(new DoubleSidedPageSpec(6, 6, false, false, false, false));
+
+        // Page 4: Month 3 (April when StartMonth=1) (rotated 180°)
         pages.Add(new DoubleSidedPageSpec(3, 3, false, false, true, false));
-  
-  // Page 7: Month 9 (normal)
+
+      // Page 5: Month 7 (August when StartMonth=1)
+        pages.Add(new DoubleSidedPageSpec(7, 7, false, false, false, false));
+
+        // Page 6: Month 2 (March when StartMonth=1) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(2, 2, false, false, true, false));
+
+   // Page 7: Month 8 (September when StartMonth=1)
+    pages.Add(new DoubleSidedPageSpec(8, 8, false, false, false, false));
+
+        // Page 8: Month 1 (February when StartMonth=1) (rotated 180°)
+    pages.Add(new DoubleSidedPageSpec(1, 1, false, false, true, false));
+
+        // Page 9: Month 9 (October when StartMonth=1)
         pages.Add(new DoubleSidedPageSpec(9, 9, false, false, false, false));
-  
-        // Page 8: Month 2 (rotated 180°)
-      pages.Add(new DoubleSidedPageSpec(2, 2, false, false, true, false));
-        
-  // Page 9: Month 10 (normal)
-   pages.Add(new DoubleSidedPageSpec(10, 10, false, false, false, false));
-   
-        // Page 10: Month 1 (rotated 180°)
-   pages.Add(new DoubleSidedPageSpec(1, 1, false, false, true, false));
-     
-        // Page 11: Month 11 (normal)
-        pages.Add(new DoubleSidedPageSpec(11, 11, false, false, false, false));
+
+        // Page 10: Month 0 (January when StartMonth=1) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, true, false));
+
+        // Page 11: Month 10 (November when StartMonth=1)
+        pages.Add(new DoubleSidedPageSpec(10, 10, false, false, false, false));
 
         // Page 12: Month -1 (Previous December) (rotated 180°)
-        // When includePreviousDecember is true, this shows previous year's December
+    // When includePreviousDecember is true, this shows previous year's December
         // The UsePreviousYearPhoto flag tells the renderer to look for photos with MonthIndex = -2
-        pages.Add(new DoubleSidedPageSpec(-1, -1, includePreviousDecember, false, true, false));
-    
-  // Page 13: Month 12 (December of current year) (normal)
-        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, false, false));
-  
+    pages.Add(new DoubleSidedPageSpec(-1, -1, includePreviousDecember, false, true, false));
+
+      // Page 13: Month 11 (December of current year when StartMonth=1)
+      pages.Add(new DoubleSidedPageSpec(11, 11, false, false, false, false));
+
         // Page 14: Front cover and rear cover (split page, rotated 180°)
         pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true, false));
 
-     return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
+        return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
     }
 
     private record DoubleSidedPageSpec(int PhotoMonthIndex, int CalendarMonthIndex, bool UsePreviousYearPhoto, bool IsCoversPage, bool Rotated, bool SwapPhotoAndCalendar);
@@ -288,52 +289,52 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
 
             // Get photo layout for the photo month
             var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
-    ? perMonth
-    : project.LayoutSpec.PhotoLayout;
+                                ? perMonth
+                                : project.LayoutSpec.PhotoLayout;
 
             // Draw photos
             var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
- foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
-          {
-   sk.Save();
-    sk.ClipRect(rect, antialias: true);
+            foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
+            {
+                sk.Save();
+                sk.ClipRect(rect, antialias: true);
 
-     var photoMonthIndex = pageSpec.PhotoMonthIndex;
+                var photoMonthIndex = pageSpec.PhotoMonthIndex;
 
-        // Handle previous December (month index -1)
-   // When UsePreviousYearPhoto is true, we look for photos assigned to page -2 in designer
-     // These are stored with MonthIndex = -2
-  
-          ImageAsset? asset = null;
-   if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == -1)
-    {
-  // Look for photos assigned to previous year's December
-    // These are stored with MonthIndex = -2 in the designer
-          asset = project.ImageAssets
-       .Where(a => a.Role == "monthPhoto" && a.MonthIndex == -2 && (a.SlotIndex ?? 0) == slotIndex)
-      .OrderBy(a => a.Order)
-    .FirstOrDefault();
- }
-          else
-          {
-  asset = project.ImageAssets
-    .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
-   .OrderBy(a => a.Order)
-            .FirstOrDefault();
- }
+                // Handle previous December (month index -1)
+                // When UsePreviousYearPhoto is true, we look for photos assigned to page -2 in designer
+                // These are stored with MonthIndex = -2
 
-   if (asset != null && File.Exists(asset.Path))
-     {
-   var bmp = GetOrLoadBitmap(asset.Path, imageCache);
-  if (bmp != null)
-   DrawBitmapWithPanZoom(sk, bmp, rect, asset);
-    }
-   sk.Restore();
-   }
+                ImageAsset? asset = null;
+                if (pageSpec.UsePreviousYearPhoto && pageSpec.PhotoMonthIndex == -1)
+                {
+                    // Look for photos assigned to previous year's December
+                    // These are stored with MonthIndex = -2 in the designer
+                    asset = project.ImageAssets
+                            .Where(a => a.Role == "monthPhoto" && a.MonthIndex == -2 && (a.SlotIndex ?? 0) == slotIndex)
+                            .OrderBy(a => a.Order)
+                            .FirstOrDefault();
+                }
+                else
+                {
+                    asset = project.ImageAssets
+                      .Where(a => a.Role == "monthPhoto" && a.MonthIndex == photoMonthIndex && (a.SlotIndex ?? 0) == slotIndex)
+                     .OrderBy(a => a.Order)
+                              .FirstOrDefault();
+                }
 
- // Draw calendar for the calendar month
-     DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex);
-  }
+                if (asset != null && File.Exists(asset.Path))
+                {
+                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    if (bmp != null)
+                        DrawBitmapWithPanZoom(sk, bmp, rect, asset);
+                }
+                sk.Restore();
+            }
+
+            // Draw calendar for the calendar month
+            DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex);
+        }
 
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
@@ -366,33 +367,33 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
 
             // Image cache to avoid re-decoding same images - use concurrent dictionary for thread safety
             var imageCache = new System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>();
-            
+
             // Thread-safe counter for progress reporting
             int completedPages = 0;
             var progressLock = new object();
-            
+
             try
             {
                 // Parallel rendering of all pages
                 var renderedPages = new byte[totalPages][];
-                
+
                 // Optimize parallel degree for mobile devices
                 int maxParallelism = GetOptimalParallelism();
-                
-                Parallel.For(0, totalPages, new ParallelOptions 
-                { 
+
+                Parallel.For(0, totalPages, new ParallelOptions
+                {
                     CancellationToken = cancellationToken,
                     MaxDegreeOfParallelism = maxParallelism
-                }, 
+                },
                 pageIndex =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     var p = pagesList[pageIndex];
-                    
+
                     // Render page to JPEG bytes
                     renderedPages[pageIndex] = RenderPageToJpeg(project, p.idx, p.cover, p.backCover, pageWpt, pageHpt, TargetDpi, imageCache);
-                    
+
                     // Update progress in thread-safe manner
                     int currentCompleted;
                     lock (progressLock)
@@ -400,27 +401,27 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
                         completedPages++;
                         currentCompleted = completedPages;
                     }
-                    
+
                     // Report progress
                     if (progress != null)
                     {
-                        var pageName = p.cover ? "Front Cover" : 
-                                      p.backCover ? "Back Cover" : 
+                        var pageName = p.cover ? "Front Cover" :
+                                      p.backCover ? "Back Cover" :
                                       new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
-                        progress.Report(new ExportProgress 
-                        { 
-                            CurrentPage = currentCompleted, 
-                            TotalPages = totalPages, 
+                        progress.Report(new ExportProgress
+                        {
+                            CurrentPage = currentCompleted,
+                            TotalPages = totalPages,
                             Status = $"Rendering {pageName}... ({currentCompleted}/{totalPages})"
                         });
                     }
                 });
 
                 // All pages rendered - ensure final rendering progress is shown
-                progress?.Report(new ExportProgress 
-                { 
-                    CurrentPage = totalPages, 
-                    TotalPages = totalPages, 
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
                     Status = "All pages rendered, creating PDF..."
                 });
 
@@ -447,30 +448,30 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
                 });
 
                 // Final progress update - before PDF generation
-                progress?.Report(new ExportProgress 
-                { 
-                    CurrentPage = totalPages, 
-                    TotalPages = totalPages, 
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
                     Status = "Generating PDF file..."
                 });
 
                 using var stream = new MemoryStream();
                 doc.GeneratePdf(stream);
-                
+
                 // Small delay to ensure the "Generating PDF file..." message is visible
                 if (progress != null)
                 {
                     await Task.Delay(50, cancellationToken);
                 }
-                
+
                 // Update after PDF generation complete
-                progress?.Report(new ExportProgress 
-                { 
-                    CurrentPage = totalPages, 
-                    TotalPages = totalPages, 
+                progress?.Report(new ExportProgress
+                {
+                    CurrentPage = totalPages,
+                    TotalPages = totalPages,
                     Status = "Export complete!"
                 });
-                
+
                 return stream.ToArray();
             }
             finally
@@ -489,7 +490,7 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
     {
         // Detect platform and optimize accordingly
         int cores = Environment.ProcessorCount;
-        
+
 #if ANDROID || IOS
         // On mobile devices, use fewer threads to prevent overheating and battery drain
         // Also helps with memory pressure on constrained devices
@@ -516,7 +517,7 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
         // Use full page for borderless covers, otherwise use margins
         var m = project.Margins;
         SKRect contentRect;
-        
+
         if (renderCover && project.CoverSpec.BorderlessFrontCover)
         {
             // Front cover with borderless - use full page
@@ -725,65 +726,65 @@ pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
         // Handle previous December (month index -1)
         int month, year;
         if (monthIndex == -1)
-      {
+        {
             // Previous year's December
-          month = 12;
+            month = 12;
             year = project.Year - 1;
         }
         else
- {
+        {
             // Normal month calculation
-  month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
+            month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
             year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
         }
- 
-var engine = new CalendarEngine();
-   var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
-  float headerH = 40;
-   var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
+        var engine = new CalendarEngine();
+        var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
+
+        float headerH = 40;
+        var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
         var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-      var titleWidth = titlePaint.MeasureText(title);
+        var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
         float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
-      string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-      int shift = (int)project.FirstDayOfWeek;
+        string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+        int shift = (int)project.FirstDayOfWeek;
         var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
-      using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
-  using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
+        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
+        using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
 
-      float colW = dowRect.Width / 7f;
+        float colW = dowRect.Width / 7f;
         for (int c = 0; c < 7; c++)
         {
-    var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+            var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
             var t = displayDows[c];
-     var tw = textPaint.MeasureText(t);
-   canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
+            var tw = textPaint.MeasureText(t);
+            canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
             canvas.DrawRect(cell, gridPen);
-    }
+        }
 
-      var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
-      int rows = weeks.Count;
+        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
+        int rows = weeks.Count;
         float rowH = weeksArea.Height / rows;
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < 7; c++)
-     {
-            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-          canvas.DrawRect(cell, gridPen);
+            {
+                var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
+                canvas.DrawRect(cell, gridPen);
                 var date = weeks[r][c];
                 if (date.HasValue && date.Value.Month == month)
-         {
-     var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
- canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-}
-    }
+                {
+                    var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+                    canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+                }
+            }
         }
     }
 }
