@@ -51,46 +51,46 @@ public sealed class PdfExportService : IPdfExportService
         // For a January start: Month 0=Jan, Month 5=June, Month 11=December
         // Param order: PhotoMonthIndex, CalendarMonthIndex, UsePreviousYear, IsCovers, Rotated, SwapPhotoAndCalendar
 
-        // Page 1: Month 5 (June when StartMonth=1)
+        // Page 1: Month 5 photo (June) with Month 5 calendar (June)
         pages.Add(new DoubleSidedPageSpec(5, 5, false, false, false, false));
 
-        // Page 2: Month 4 (May when StartMonth=1) (rotated 180°)
-     pages.Add(new DoubleSidedPageSpec(4, 4, false, false, true, false));
+        // Page 2: Month 6 photo (July) with Month 4 calendar (May) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(6, 4, false, false, true, false));
 
-     // Page 3: Month 6 (July when StartMonth=1)
-      pages.Add(new DoubleSidedPageSpec(6, 6, false, false, false, false));
+        // Page 3: Month 4 photo (May) with Month 6 calendar (July)
+        pages.Add(new DoubleSidedPageSpec(4, 6, false, false, false, false));
 
-        // Page 4: Month 3 (April when StartMonth=1) (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(3, 3, false, false, true, false));
+        // Page 4: Month 7 photo (August) with Month 3 calendar (April) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(7, 3, false, false, true, false));
 
-      // Page 5: Month 7 (August when StartMonth=1)
-        pages.Add(new DoubleSidedPageSpec(7, 7, false, false, false, false));
+        // Page 5: Month 3 photo (April) with Month 7 calendar (August)
+        pages.Add(new DoubleSidedPageSpec(3, 7, false, false, false, false));
 
-        // Page 6: Month 2 (March when StartMonth=1) (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(2, 2, false, false, true, false));
+        // Page 6: Month 8 photo (September) with Month 2 calendar (March) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(8, 2, false, false, true, false));
 
-   // Page 7: Month 8 (September when StartMonth=1)
-    pages.Add(new DoubleSidedPageSpec(8, 8, false, false, false, false));
+        // Page 7: Month 2 photo (March) with Month 8 calendar (September)
+        pages.Add(new DoubleSidedPageSpec(2, 8, false, false, false, false));
 
-        // Page 8: Month 1 (February when StartMonth=1) (rotated 180°)
-    pages.Add(new DoubleSidedPageSpec(1, 1, false, false, true, false));
+        // Page 8: Month 9 photo (October) with Month 1 calendar (February) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(9, 1, false, false, true, false));
 
-        // Page 9: Month 9 (October when StartMonth=1)
-        pages.Add(new DoubleSidedPageSpec(9, 9, false, false, false, false));
+        // Page 9: Month 1 photo (February) with Month 9 calendar (October)
+        pages.Add(new DoubleSidedPageSpec(1, 9, false, false, false, false));
 
-        // Page 10: Month 0 (January when StartMonth=1) (rotated 180°)
-        pages.Add(new DoubleSidedPageSpec(0, 0, false, false, true, false));
+        // Page 10: Month 10 photo (November) with Month 0 calendar (January) (rotated 180°)
+        pages.Add(new DoubleSidedPageSpec(10, 0, false, false, true, false));
 
-        // Page 11: Month 10 (November when StartMonth=1)
-        pages.Add(new DoubleSidedPageSpec(10, 10, false, false, false, false));
+        // Page 11: Month 0 photo (January) with Month 10 calendar (November)
+        pages.Add(new DoubleSidedPageSpec(0, 10, false, false, false, false));
 
-        // Page 12: Month -1 (Previous December) (rotated 180°)
-    // When includePreviousDecember is true, this shows previous year's December
-        // The UsePreviousYearPhoto flag tells the renderer to look for photos with MonthIndex = -2
-    pages.Add(new DoubleSidedPageSpec(-1, -1, includePreviousDecember, false, true, false));
+        // Page 12: Month 11 photo (December current year) with Month -1 calendar (Previous December) (rotated 180°)
+        // When includePreviousDecember is true, calendar shows previous year's December
+        pages.Add(new DoubleSidedPageSpec(11, -1, includePreviousDecember, false, true, false));
 
-      // Page 13: Month 11 (December of current year when StartMonth=1)
-      pages.Add(new DoubleSidedPageSpec(11, 11, false, false, false, false));
+        // Page 13: Month -1 photo (Previous December) with Month 11 calendar (December of current year)
+        // When includePreviousDecember is true, photo shows previous year's December (stored as MonthIndex=-2)
+        pages.Add(new DoubleSidedPageSpec(-1, 11, includePreviousDecember, false, false, false));
 
         // Page 14: Front cover and rear cover (split page, rotated 180°)
         pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true, false));
