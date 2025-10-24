@@ -1,8 +1,15 @@
 namespace CalendarMaker_MAUI.Models;
 
+/// <summary>
+/// Provides utility methods for retrieving page dimensions in various units.
+/// </summary>
 public static class PageSizes
 {
-    // Returns width/height in inches before orientation
+    /// <summary>
+    /// Gets the width and height of a page size in inches before applying orientation.
+    /// </summary>
+    /// <param name="size">The page size to get dimensions for.</param>
+    /// <returns>A tuple containing the width and height in inches. Returns (0, 0) for custom sizes.</returns>
     public static (double widthIn, double heightIn) GetInches(PageSize size)
     {
         return size switch
@@ -17,6 +24,11 @@ public static class PageSizes
         };
     }
 
+    /// <summary>
+    /// Gets the width and height of a page in points (1 point = 1/72 inch) with orientation applied.
+    /// </summary>
+    /// <param name="spec">The page specification containing size, orientation, and optional custom dimensions.</param>
+    /// <returns>A tuple containing the width and height in points, adjusted for the specified orientation.</returns>
     public static (double widthPt, double heightPt) GetPoints(PageSpec spec)
     {
         if (spec.Size == PageSize.Custom && spec.CustomWidthPt.HasValue && spec.CustomHeightPt.HasValue)
