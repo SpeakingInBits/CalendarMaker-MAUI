@@ -1,0 +1,46 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    name: Build and Test (Windows)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.x'
+      
+    - name: Install .NET MAUI workload
+      run: dotnet workload install maui
+      
+    - name: Restore dependencies
+      run: dotnet restore CalendarMaker-MAUI/CalendarMaker-MAUI.csproj
+      
+    - name: Build
+      run: dotnet build CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -c Release -f net10.0-windows10.0.19041.0 --no-restore
+
+    - name: Run dotnet format
+      run: dotnet format CalendarMaker-MAUI/CalendarMaker-MAUI.csproj --verify-no-changes --verbosity diagnostic
+      continue-on-error: true
+      
+    - name: Run tests
+      run: dotnet test CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -c Release -f net10.0-windows10.0.19041.0 --no-build --verbosity normal
+      
+    # - name: Upload build artifacts
+    #   uses: actions/upload-artifact@v4
+    #   if: success()
+    #   with:
+    #     name: windows-build
+    #     path: CalendarMaker-MAUI/bin/Release/net10.0-windows10.0.19041.0/
+    #     retention-days: 7
