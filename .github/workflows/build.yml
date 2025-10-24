@@ -25,7 +25,7 @@ jobs:
       run: dotnet workload install maui
       
     - name: Restore dependencies
-      run: dotnet restore CalendarMaker-MAUI/CalendarMaker-MAUI.csproj
+      run: dotnet restore CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -f net10.0-windows10.0.19041.0
       
     - name: Build
       run: dotnet build CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -c Release -f net10.0-windows10.0.19041.0 --no-restore
