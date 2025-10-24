@@ -25,17 +25,17 @@ jobs:
       run: dotnet workload install maui
       
     - name: Restore dependencies
-      run: dotnet restore CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -f net10.0-windows10.0.19041.0
+      run: dotnet restore
       
     - name: Build
-      run: dotnet build CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -c Release -f net10.0-windows10.0.19041.0 --no-restore
+      run: dotnet build -c Release --no-restore
 
     - name: Run dotnet format
       run: dotnet format CalendarMaker-MAUI/CalendarMaker-MAUI.csproj --verify-no-changes --verbosity diagnostic
       continue-on-error: true
       
     - name: Run tests
-      run: dotnet test CalendarMaker-MAUI/CalendarMaker-MAUI.csproj -c Release -f net10.0-windows10.0.19041.0 --no-build --verbosity normal
+      run: dotnet test -c Release --no-build --verbosity normal
       
     # - name: Upload build artifacts
     #   uses: actions/upload-artifact@v4
