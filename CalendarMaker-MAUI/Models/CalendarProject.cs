@@ -1,5 +1,7 @@
 namespace CalendarMaker_MAUI.Models;
 
+using CalendarMaker_MAUI.Services;
+
 /// <summary>
 /// Represents a calendar creation project with all its configuration settings, assets, and metadata.
 /// </summary>
@@ -33,7 +35,7 @@ public sealed class CalendarProject
     /// <summary>
     /// Gets or sets the template key that determines the calendar's design template.
     /// </summary>
-    public string TemplateKey { get; set; } = "PhotoMonthlyClassic";
+    public string TemplateKey { get; set; } = TemplateService.DefaultTemplateKey;
 
     /// <summary>
     /// Gets or sets the page specifications including size and orientation.
