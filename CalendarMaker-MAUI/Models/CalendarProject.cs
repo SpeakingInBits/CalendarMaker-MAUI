@@ -1,5 +1,7 @@
 namespace CalendarMaker_MAUI.Models;
 
+using CalendarMaker_MAUI.Services;
+
 public sealed class CalendarProject
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -8,7 +10,7 @@ public sealed class CalendarProject
     public int StartMonth { get; set; } = 1; // 1..12
     public DayOfWeek FirstDayOfWeek { get; set; } = DayOfWeek.Sunday;
 
-    public string TemplateKey { get; set; } = "PhotoMonthlyClassic";
+    public string TemplateKey { get; set; } = TemplateService.DefaultTemplateKey;
 
     public PageSpec PageSpec { get; set; } = new();
     public Margins Margins { get; set; } = new();
