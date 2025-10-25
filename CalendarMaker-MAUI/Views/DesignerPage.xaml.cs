@@ -18,6 +18,9 @@ public partial class DesignerPage : ContentPage
     private readonly IAssetService _assets;
     private readonly IPdfExportService _pdf;
     private readonly ILayoutCalculator _layoutCalculator;
+    private readonly IDialogService _dialogService;
+    private readonly INavigationService _navigationService;
+    private readonly IFilePickerService _filePickerService;
     private readonly SKCanvasView _canvas;
 
     private int _pageIndex; // -1=Front Cover, 0-11=Months, 12=Back Cover
@@ -42,14 +45,25 @@ public partial class DesignerPage : ContentPage
 
     public string? ProjectId { get; set; }
 
-    public DesignerPage(ICalendarEngine engine, IProjectStorageService storage, IAssetService assets, IPdfExportService pdf, ILayoutCalculator layoutCalculator)
+    public DesignerPage(
+        ICalendarEngine engine,
+        IProjectStorageService storage,
+        IAssetService assets,
+        IPdfExportService pdf,
+        ILayoutCalculator layoutCalculator,
+        IDialogService dialogService,
+     INavigationService navigationService,
+        IFilePickerService filePickerService)
     {
         InitializeComponent();
-        _engine = engine;
+     _engine = engine;
         _storage = storage;
         _assets = assets;
         _pdf = pdf;
         _layoutCalculator = layoutCalculator;
+ _dialogService = dialogService;
+        _navigationService = navigationService;
+   _filePickerService = filePickerService;
 
         // Ensure CanvasHost exists before assigning
         _canvas = new SKCanvasView { IgnorePixelScaling = false };
@@ -57,12 +71,10 @@ public partial class DesignerPage : ContentPage
         _canvas.EnableTouchEvents = true;
         _canvas.Touch += OnCanvasTouch;
 
-        if (CanvasHost != null)
-        {
-            CanvasHost.Content = _canvas;
-        }
+   if (CanvasHost != null)
+      CanvasHost.Content = _canvas;
 
-        BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
+        BackBtn.Clicked += async (_, __) => await _navigationService.GoBackAsync();
         PrevBtn.Clicked += (_, __) => NavigatePage(-1);
         NextBtn.Clicked += (_, __) => NavigatePage(1);
         AddPhotoBtn.Clicked += async (_, __) => await ImportPhotosToProjectAsync();
@@ -111,20 +123,20 @@ public partial class DesignerPage : ContentPage
     private async Task ImportPhotosToProjectAsync()
     {
         if (_project == null) return;
-
-        var results = await FilePicker.PickMultipleAsync(new PickOptions
-        {
-            PickerTitle = "Select photos to add to project",
-            FileTypes = FilePickerFileType.Images
+        
+     var results = await _filePickerService.PickMultipleFilesAsync(new PickOptions 
+        { 
+            PickerTitle = "Select photos to add to project", 
+            FileTypes = FilePickerFileType.Images 
         });
-
+        
         if (results == null || !results.Any()) return;
 
         foreach (var result in results)
         {
             await _assets.ImportProjectPhotoAsync(_project, result);
-        }
-
+     }
+   
         // Refresh the display
         _canvas.InvalidateSurface();
     }
@@ -164,80 +176,81 @@ public partial class DesignerPage : ContentPage
         // Assign selected photo to the active target
         modal.PhotoSelected += async (_, args) =>
         {
-            if (_project == null) return;
-            var selected = args.SelectedAsset;
-
-            string role;
-            int? monthIndex = null;
-            int? slotIndex = _activeSlotIndex;
-
-            if (_pageIndex == -1)
-            {
-                role = "coverPhoto";
-            }
-            else if (_pageIndex == 12)
-            {
-                role = "backCoverPhoto";
-            }
-            else
-            {
-                role = "monthPhoto";
-                monthIndex = _pageIndex; // This handles -2 for previous December
-            }
-
-            await _assets.AssignPhotoToSlotAsync(_project, selected.Id, monthIndex ?? 0, slotIndex, role);
-            SyncZoomUI();
-            _canvas.InvalidateSurface();
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+   if (_project == null) return;
+     var selected = args.SelectedAsset;
+            
+   string role;
+        int? monthIndex = null;
+          int? slotIndex = _activeSlotIndex;
+          
+   if (_pageIndex == -1)
+    {
+    role = "coverPhoto";
+      }
+   else if (_pageIndex == 12)
+      {
+    role = "backCoverPhoto";
+  }
+  else
+        {
+        role = "monthPhoto";
+    monthIndex = _pageIndex; // This handles -2 for previous December
+        }
+ 
+   await _assets.AssignPhotoToSlotAsync(_project, selected.Id, monthIndex ?? 0, slotIndex, role);
+    SyncZoomUI();
+    _canvas.InvalidateSurface();
+    try { await _navigationService.PopModalAsync(); } catch { }
         };
 
         // Remove any existing photo from the active target
         modal.RemoveRequested += async (_, __) =>
-           {
-               if (_project == null) return;
-
-               if (_pageIndex == -1) // Front cover
-               {
-                   var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
-                   if (existingPhoto != null)
-                   {
-                       _project.ImageAssets.Remove(existingPhoto);
-                       await _storage.UpdateProjectAsync(_project);
-                   }
-               }
-               else if (_pageIndex == 12) // Back cover
-               {
-                   var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
-                   if (existingPhoto != null)
-                   {
-                       _project.ImageAssets.Remove(existingPhoto);
-                       await _storage.UpdateProjectAsync(_project);
-                   }
-               }
-               else // Month page (including -2 for previous December)
-               {
-                   await _assets.RemovePhotoFromSlotAsync(_project, _pageIndex, _activeSlotIndex, "monthPhoto");
-               }
-
-               _canvas.InvalidateSurface();
-               try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-           };
-
-        // Close without changes
-        modal.Cancelled += async (_, __) =>
-           {
-               try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-           };
-
-        try
         {
-            await Shell.Current.Navigation.PushModalAsync(modal, true);
-        }
-        catch
+       if (_project == null) return;
+            
+            if (_pageIndex == -1) // Front cover
+         {
+  var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+          if (existingPhoto != null)
         {
-            // Fallback if Shell not available
-            await Navigation.PushModalAsync(modal, true);
-        }
+   _project.ImageAssets.Remove(existingPhoto);
+   await _storage.UpdateProjectAsync(_project);
+         }
+    }
+       else if (_pageIndex == 12) // Back cover
+    {
+        var existingPhoto = _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
+             if (existingPhoto != null)
+       {
+       _project.ImageAssets.Remove(existingPhoto);
+await _storage.UpdateProjectAsync(_project);
+     }
+      }
+            else // Month page (including -2 for previous December)
+       {
+     await _assets.RemovePhotoFromSlotAsync(_project, _pageIndex, _activeSlotIndex, "monthPhoto");
+            }
+ 
+_canvas.InvalidateSurface();
+      try { await _navigationService.PopModalAsync(); } catch { }
+  };
+
+ // Close without changes
+   modal.Cancelled += async (_, __) =>
+      {
+       try { await _navigationService.PopModalAsync(); } catch { }
+      };
+
+     try
+    {
+          await _navigationService.PushModalAsync(modal, true);
+   }
+      catch
+      {
+            // Fallback if navigation service fails
+ await Navigation.PushModalAsync(modal, true);
+     }
+
     }
 
     private void PopulateStaticPickers()
@@ -357,54 +370,54 @@ public partial class DesignerPage : ContentPage
     private void OnDoubleSidedChanged(object? sender, CheckedChangedEventArgs e)
     {
         if (_project == null) return;
-
-        // If enabling double-sided mode and start month is not January, warn and change it
-        if (e.Value && _project.StartMonth != 1)
+        
+     // If enabling double-sided mode and start month is not January, warn and change it
+  if (e.Value && _project.StartMonth != 1)
         {
-            MainThread.BeginInvokeOnMainThread(async () =>
-         {
-             bool proceed = await this.DisplayAlert(
-"Change Start Month?",
-  "Double-sided calendars require a January start month. Would you like to change the start month to January?",
-"Yes, Change to January",
- "Cancel");
-
-             if (proceed)
-             {
-                 _project.StartMonth = 1;
-                 StartMonthPicker.SelectedIndex = 0; // January is index 0
-                 _project.EnableDoubleSided = true;
-                 await _storage.UpdateProjectAsync(_project);
-
-                 // Reset to front cover to show the change
-                 _pageIndex = -1;
-                 _activeSlotIndex = 0;
-                 SyncZoomUI();
-                 UpdatePageLabel();
-                 _canvas.InvalidateSurface();
-             }
-             else
-             {
-                 // User cancelled, revert the checkbox
-                 DoubleSidedCheckBox.CheckedChanged -= OnDoubleSidedChanged;
-                 DoubleSidedCheckBox.IsChecked = false;
-                 DoubleSidedCheckBox.CheckedChanged += OnDoubleSidedChanged;
-             }
-         });
-            return;
+          MainThread.BeginInvokeOnMainThread(async () =>
+       {
+      bool proceed = await _dialogService.ShowConfirmAsync(
+    "Change Start Month?",
+       "Double-sided calendars require a January start month. Would you like to change the start month to January?",
+   "Yes, Change to January",
+      "Cancel");
+        
+           if (proceed)
+      {
+ _project.StartMonth = 1;
+StartMonthPicker.SelectedIndex = 0; // January is index 0
+_project.EnableDoubleSided = true;
+   await _storage.UpdateProjectAsync(_project);
+ 
+   // Reset to front cover to show the change
+         _pageIndex = -1;
+     _activeSlotIndex = 0;
+SyncZoomUI();
+       UpdatePageLabel();
+   _canvas.InvalidateSurface();
         }
-
-        _project.EnableDoubleSided = e.Value;
-        _ = _storage.UpdateProjectAsync(_project);
-
-        // Reset to front cover if we were on the previous December page and toggled off
-        if (!e.Value && _pageIndex == -2)
-        {
-            _pageIndex = -1;
-        }
-
-        UpdatePageLabel();
-        _canvas.InvalidateSurface();
+ else
+   {
+          // User cancelled, revert the checkbox
+         DoubleSidedCheckBox.CheckedChanged -= OnDoubleSidedChanged;
+   DoubleSidedCheckBox.IsChecked = false;
+      DoubleSidedCheckBox.CheckedChanged += OnDoubleSidedChanged;
+         }
+   });
+ return;
+   }
+        
+ _project.EnableDoubleSided = e.Value;
+     _ = _storage.UpdateProjectAsync(_project);
+        
+ // Reset to front cover if we were on the previous December page and toggled off
+  if (!e.Value && _pageIndex == -2)
+  {
+  _pageIndex = -1;
+      }
+        
+    UpdatePageLabel();
+    _canvas.InvalidateSurface();
     }
 
     private void SyncPhotoLayoutPicker()
@@ -462,7 +475,7 @@ public partial class DesignerPage : ContentPage
         if (handled)
         {
             SyncZoomUI();
-            _ = _storage.UpdateProjectAsync(_project);
+            _storage.UpdateProjectAsync(_project);
             _canvas.InvalidateSurface();
             e.Handled = true;
         }
@@ -577,11 +590,11 @@ public partial class DesignerPage : ContentPage
         Exception? exportException = null;
 
         progressModal.Cancelled += async (_, __) =>
-               {
-                   try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-               };
+        {
+      try { await _navigationService.PopModalAsync(); } catch { }
+        };
 
-        await Shell.Current.Navigation.PushModalAsync(progressModal, true);
+        await _navigationService.PushModalAsync(progressModal, true);
 
         _ = Task.Run(async () =>
               {
@@ -593,12 +606,12 @@ public partial class DesignerPage : ContentPage
                   catch (OperationCanceledException)
                   {
                       await MainThread.InvokeOnMainThreadAsync(async () =>
-                       {
-                      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-                      await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
-                  });
-                      return;
-                  }
+       {
+try { await _navigationService.PopModalAsync(); } catch { }
+   await _dialogService.ShowAlertAsync("Export Cancelled", "The export was cancelled.");
+      });
+     return;
+   }
                   catch (Exception ex)
                   {
                       exportException = ex;
@@ -606,11 +619,11 @@ public partial class DesignerPage : ContentPage
 
                   await MainThread.InvokeOnMainThreadAsync(async () =>
          {
-                try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+                try { await _navigationService.PopModalAsync(); } catch { }
 
                 if (exportException != null)
                 {
-                    await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+                    await _dialogService.ShowAlertAsync("Export Failed", exportException.Message);
                 }
                 else if (exportCompleted && exportedBytes != null)
                 {
@@ -637,10 +650,10 @@ public partial class DesignerPage : ContentPage
 
         progressModal.Cancelled += async (_, __) =>
   {
-      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+      try { await _navigationService.PopModalAsync(); } catch { }
   };
 
-        await Shell.Current.Navigation.PushModalAsync(progressModal, true);
+        await _navigationService.PushModalAsync(progressModal, true);
 
         _ = Task.Run(async () =>
    {
@@ -653,8 +666,8 @@ public partial class DesignerPage : ContentPage
        {
            await MainThread.InvokeOnMainThreadAsync(async () =>
        {
-           try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-           await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+           try { await _navigationService.PopModalAsync(); } catch { }
+           await _dialogService.ShowAlertAsync("Export Cancelled", "The export was cancelled.");
        });
            return;
        }
@@ -665,11 +678,11 @@ public partial class DesignerPage : ContentPage
 
        await MainThread.InvokeOnMainThreadAsync(async () =>
   {
-      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+      try { await _navigationService.PopModalAsync(); } catch { }
 
       if (exportException != null)
       {
-          await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+          await _dialogService.ShowAlertAsync("Export Failed", exportException.Message);
       }
       else if (exportCompleted && exportedBytes != null)
       {
@@ -683,10 +696,10 @@ public partial class DesignerPage : ContentPage
     private async Task SaveBytesAsync(string suggestedFileName, byte[] bytes)
     {
         using var stream = new MemoryStream(bytes);
-        var result = await FileSaver.Default.SaveAsync(suggestedFileName, stream, default);
+   var result = await _filePickerService.SaveFileAsync(suggestedFileName, stream, default);
         if (!result.IsSuccessful)
         {
-            await this.DisplayAlertAsync("Save Failed", result.Exception?.Message ?? "Unknown error", "OK");
+  await _dialogService.ShowAlertAsync("Save Failed", result.Exception?.Message ?? "Unknown error");
         }
     }
 

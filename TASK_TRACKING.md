@@ -146,8 +146,8 @@
 
 | Phase | Priority | Est. Hours | Status |
 |-------|----------|------------|--------|
-| Phase 1: Foundation | HIGH | 16h | ?? In Progress (11h/16h) |
-| Phase 2: Rendering | HIGH | 33h | ?? In Progress (6h/33h) |
+| Phase 1: Foundation | HIGH | 16h | ?? In Progress (11.8h/16h - 74%) |
+| Phase 2: Rendering | HIGH | 33h | ?? In Progress (6h/33h - 18%) |
 | Phase 3: DesignerPage | HIGH | 44h | ? |
 | Phase 4: Services | MEDIUM | 36h | ? |
 | Phase 5: Testing | HIGH | 76h | ? |
@@ -155,7 +155,7 @@
 | Phase 7: Quality | MEDIUM | 40h | ? |
 | Phase 8: Performance | MEDIUM | 24h | ? |
 | Phase 9: Documentation | LOW | 17h | ? |
-| **TOTAL** | | **~312 hours** | **4/62 tasks (6.5%)** |
+| **TOTAL** | | **~312 hours** | **4/62 tasks (6.5%)**  + 2 bonus refactorings |
 
 ---
 
@@ -184,4 +184,6 @@
 | 2024-01 | 1.1 | Create IDialogService & implementation | 1h | Abstract DisplayAlert functionality. Improves testability by decoupling from Page.DisplayAlert. |
 | 2024-01 | 1.2 | Create INavigationService & implementation | 1h | Abstract Shell navigation. Supports route navigation, back navigation, and modal operations. |
 | 2024-01 | 1.3 | Create IFilePickerService & implementation | 1h | Abstract FilePicker and FileSaver operations. Enables testing of file operations. |
+| 2024-01 | ** | Refactor DesignerPage to use foundation services | 0.5h | Replaced 15+ direct platform API calls with service interfaces. Removed Shell, FilePicker, FileSaver, and DisplayAlert dependencies. |
+| 2024-01 | ** | Refactor ProjectsPage to use foundation services | 0.3h | Replaced Shell navigation and DisplayAlert calls with service interfaces. Fully decoupled from platform APIs. |
 | ___ | ___ | ___ | ___ | ___ |
