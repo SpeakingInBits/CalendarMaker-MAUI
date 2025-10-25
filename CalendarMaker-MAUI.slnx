@@ -6,4 +6,5 @@
   <Project Path="CalendarMaker-MAUI/CalendarMaker-MAUI.csproj">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="CalendarMaker.Tests/CalendarMaker.Tests.csproj" />
 </Solution>

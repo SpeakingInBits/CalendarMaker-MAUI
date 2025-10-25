@@ -1,16 +1,21 @@
 using CalendarMaker_MAUI.Models;
 using CalendarMaker_MAUI.ViewModels;
+using CalendarMaker_MAUI.Services;
 
 namespace CalendarMaker_MAUI.Views;
 
 public partial class ProjectsPage : ContentPage
 {
     private readonly ProjectsViewModel _vm;
+    private readonly IDialogService _dialogService;
+    private readonly INavigationService _navigationService;
 
-    public ProjectsPage(ProjectsViewModel vm)
+    public ProjectsPage(ProjectsViewModel vm, IDialogService dialogService, INavigationService navigationService)
     {
         InitializeComponent();
         _vm = vm;
+        _dialogService = dialogService;
+        _navigationService = navigationService;
         BindingContext = _vm;
         CreateBtn.Text = "New Project";
         CreateBtn.Clicked += async (_, __) => await OnNewProjectClicked();
@@ -26,12 +31,12 @@ public partial class ProjectsPage : ContentPage
 
         modal.Cancelled += async (_, __) =>
         {
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+            try { await _navigationService.PopModalAsync(); } catch { }
             tcs.TrySetResult(null);
         };
         modal.Created += async (_, __) =>
         {
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+            try { await _navigationService.PopModalAsync(); } catch { }
             if (modal.SelectedPreset is string p && modal.ProjectName is string n && modal.Year is int y)
             {
                 tcs.TrySetResult((p, n, y));
@@ -42,7 +47,7 @@ public partial class ProjectsPage : ContentPage
             }
         };
 
-        await Shell.Current.Navigation.PushModalAsync(modal);
+        await _navigationService.PushModalAsync(modal);
         var result = await tcs.Task;
         if (result is null)
         {
@@ -96,7 +101,11 @@ public partial class ProjectsPage : ContentPage
     {
         if (sender is Button btn && btn.CommandParameter is CalendarProject proj)
         {
-            bool confirm = await this.DisplayAlertAsync("Delete Project", $"Delete '{proj.Name}'? This removes all its files.", "Delete", "Cancel");
+            bool confirm = await _dialogService.ShowConfirmAsync(
+                "Delete Project",
+                $"Delete '{proj.Name}'? This removes all its files.",
+                "Delete",
+                "Cancel");
             if (confirm)
             {
                 await _vm.DeleteProjectAsync(proj);
@@ -112,7 +121,7 @@ public partial class ProjectsPage : ContentPage
             try
             {
                 string route = $"designer?projectId={Uri.EscapeDataString(proj.Id)}";
-                await Shell.Current.GoToAsync(route);
+                await _navigationService.NavigateToAsync(route);
             }
             finally
             {

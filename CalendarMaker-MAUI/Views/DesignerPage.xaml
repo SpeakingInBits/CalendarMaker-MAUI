@@ -8,71 +8,123 @@
         <ScrollView Grid.Column="0" VerticalScrollBarVisibility="Always" Padding="0,0,10,0">
             <VerticalStackLayout Spacing="10">
                 <Label Text="Designer" FontAttributes="Bold" />
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                    <Button Text="Prev" x:Name="PrevBtn" Grid.Column="0" />
-                    <Label x:Name="MonthLabel" Grid.Column="1" VerticalTextAlignment="Center" HorizontalTextAlignment="Center" />
-                    <Button Text="Next" x:Name="NextBtn" Grid.Column="2" />
-                </Grid>
-
-                <Button Text="Add Photo" x:Name="AddPhotoBtn" />
-
-                <BoxView HeightRequest="1" Color="#DDD" />
-                <Label Text="Layout" FontAttributes="Bold" />
-                <Button Text="Flip Layout" x:Name="FlipBtn" />
-                <!-- Borderless checkbox (only visible on cover pages) -->
-                <HorizontalStackLayout x:Name="BorderlessControl" Spacing="6" IsVisible="False">
-                    <CheckBox x:Name="BorderlessCheckBox" VerticalOptions="Center" />
-                    <Label Text="Borderless (no margins)" VerticalOptions="Center" />
-                </HorizontalStackLayout>
-                <!-- Split slider with reset -->
-                <Grid x:Name="SplitControlGrid" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
-                    <Label Text="Split" />
-                    <Slider x:Name="SplitSlider" Grid.Column="1" Minimum="0.3" Maximum="0.7" />
-                    <Label x:Name="SplitValueLabel" Grid.Column="2" />
-                    <Border x:Name="SplitResetBtn" Grid.Column="3"
-                            WidthRequest="36" HeightRequest="36"
-                            BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                            Padding="6" Stroke="Transparent" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 8,8,8,8">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                    <Button Text="Prev" 
+                            Command="{Binding NavigatePageCommand}" 
+                            CommandParameter="{x:Int32 -1}"
+                            Grid.Column="0" />
+                    <Label Text="{Binding PageLabel}" 
+                           Grid.Column="1" 
+                           VerticalTextAlignment="Center" 
+                           HorizontalTextAlignment="Center" />
+                    <Button Text="Next" 
+                            Command="{Binding NavigatePageCommand}" 
+                            CommandParameter="{x:Int32 1}"
+                            Grid.Column="2" />
+                    <!-- Settings Cog Icon -->
+                    <Border Grid.Column="3"
+                           WidthRequest="36" 
+                           HeightRequest="36"
+                           BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                           Padding="6" 
+                           Stroke="Transparent" 
+                           StrokeThickness="0"
+                           StrokeShape="RoundRectangle 8,8,8,8">
                         <Grid>
-                            <shapes:Path Stroke="White" StrokeThickness="2" Data="M23 4 L23 10 L17 10" />
-                            <shapes:Path Stroke="White" StrokeThickness="2" Data="M20.49 15 A9 9 0 1 1 22.62 6" />
+                            <!-- Settings Cog Icon Path -->
+                            <shapes:Path Stroke="White" 
+                                         StrokeThickness="2" 
+                                         Fill="Transparent"
+                                         Data="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
                         </Grid>
                         <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnSplitResetTapped" />
+                            <TapGestureRecognizer Command="{Binding ShowProjectSettingsCommand}" />
                         </Border.GestureRecognizers>
                     </Border>
                 </Grid>
-                <!-- Photo layout picker -->
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
-                    <Label Text="Photo Layout" />
-                    <Picker x:Name="PhotoLayoutPicker" Grid.Column="1" HorizontalOptions="FillAndExpand" >
-                        <Picker.Items>
-                            <x:String>Single</x:String>
-                            <x:String>Two (vertical split)</x:String>
-                            <x:String>Grid 2x2 (4)</x:String>
-                            <x:String>Two (stacked)</x:String>
-                            <x:String>Three (2 left, 1 right)</x:String>
-                            <x:String>Three (1 left, 2 right)</x:String>
-                        </Picker.Items>
-                    </Picker>
-                </Grid>
-                <!-- Zoom slider with reset -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
-                    <Label Text="Photo Zoom" />
-                    <Slider x:Name="ZoomSlider" Grid.Column="1" Minimum="0.5" Maximum="3.0" Value="1" />
-                    <Label x:Name="ZoomValueLabel" Grid.Column="2" />
-                    <Border x:Name="ZoomResetBtn" Grid.Column="3"
-                            WidthRequest="36" HeightRequest="36"
+
+                <Button Text="Add Photo" 
+                        Command="{Binding ImportPhotosCommand}" />
+
+                <BoxView HeightRequest="1" Color="#DDD" />
+                <Label Text="Layout" FontAttributes="Bold" />
+                <Button Text="Flip Layout" 
+                        Command="{Binding FlipLayoutCommand}" />
+        
+                <!-- Borderless checkbox (only visible on cover pages) -->
+                <HorizontalStackLayout x:Name="BorderlessControl" Spacing="6" 
+                                       IsVisible="{Binding BorderlessControlVisible}">
+                    <CheckBox IsChecked="{Binding BorderlessChecked}" 
+                              VerticalOptions="Center" />
+                    <Label Text="Borderless (no margins)" 
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+                
+                <!-- Split slider with reset -->
+                <Grid x:Name="SplitControlGrid" 
+                      ColumnDefinitions="Auto,*,Auto,Auto" 
+                      RowDefinitions="Auto"
+                      IsVisible="{Binding SplitControlVisible}">
+                    <Label Text="Split" />
+                    <Slider Grid.Column="1" 
+                            Minimum="0.3" 
+                            Maximum="0.7" 
+                            Value="{Binding SplitRatio}" />
+                    <Label Grid.Column="2" 
+                           Text="{Binding SplitRatio, StringFormat='{0:P0}'}" />
+                    <Border x:Name="SplitResetBtn" 
+                            Grid.Column="3"
+                            WidthRequest="36" 
+                            HeightRequest="36"
                             BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                            Padding="6" Stroke="Transparent" StrokeThickness="0"
+                            Padding="6" 
+                            Stroke="Transparent" 
+                            StrokeThickness="0"
                             StrokeShape="RoundRectangle 8,8,8,8">
                         <Grid>
                             <shapes:Path Stroke="White" StrokeThickness="2" Data="M23 4 L23 10 L17 10" />
                             <shapes:Path Stroke="White" StrokeThickness="2" Data="M20.49 15 A9 9 0 1 1 22.62 6" />
                         </Grid>
                         <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnZoomResetTapped" />
+                            <TapGestureRecognizer Command="{Binding ResetSplitCommand}" />
+                        </Border.GestureRecognizers>
+                    </Border>
+                </Grid>
+            
+                <!-- Photo layout picker -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
+                    <Label Text="Photo Layout" />
+                    <Picker Grid.Column="1" 
+                            HorizontalOptions="FillAndExpand"
+                            ItemsSource="{Binding PhotoLayoutNames}"
+                            SelectedIndex="{Binding SelectedPhotoLayoutIndex}" />
+                </Grid>
+        
+                <!-- Zoom slider with reset -->
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto">
+                    <Label Text="Photo Zoom" />
+                    <Slider Grid.Column="1" 
+                            Minimum="0.5" 
+                            Maximum="3.0" 
+                            Value="{Binding ZoomValue}"
+                            IsEnabled="{Binding ZoomSliderEnabled}" />
+                    <Label Grid.Column="2" 
+                           Text="{Binding ZoomValue, StringFormat='{0:F2}x'}" />
+                    <Border x:Name="ZoomResetBtn" 
+                            Grid.Column="3"
+                            WidthRequest="36" 
+                            HeightRequest="36"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                            Padding="6" 
+                            Stroke="Transparent" 
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8,8,8,8">
+                        <Grid>
+                            <shapes:Path Stroke="White" StrokeThickness="2" Data="M23 4 L23 10 L17 10" />
+                            <shapes:Path Stroke="White" StrokeThickness="2" Data="M20.49 15 A9 9 0 1 1 22.62 6" />
+                        </Grid>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ResetZoomCommand}" />
                         </Border.GestureRecognizers>
                     </Border>
                 </Grid>
@@ -81,29 +133,44 @@
                 <Label Text="Calendar" FontAttributes="Bold" />
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
                     <Label Text="Year" />
-                    <Entry x:Name="YearEntry" Grid.Column="1" Keyboard="Numeric" Placeholder="e.g. 2024" />
+                    <Entry Grid.Column="1" 
+                           Keyboard="Numeric" 
+                           Placeholder="e.g. 2024"
+                           Text="{Binding YearText}" />
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
                     <Label Text="Start Month" />
-                    <Picker x:Name="StartMonthPicker" Grid.Column="1"/>
+                    <Picker Grid.Column="1"
+                            ItemsSource="{Binding MonthNames}"
+                            SelectedIndex="{Binding SelectedStartMonthIndex}" />
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto">
                     <Label Text="First Day of Week" />
-                    <Picker x:Name="FirstDowPicker" Grid.Column="1"/>
+                    <Picker Grid.Column="1"
+                            ItemsSource="{Binding DayOfWeekNames}"
+                            SelectedIndex="{Binding SelectedFirstDayOfWeekIndex}" />
                 </Grid>
+    
                 <!-- Double-sided calendar toggle -->
                 <HorizontalStackLayout Spacing="6">
-                    <CheckBox x:Name="DoubleSidedCheckBox" VerticalOptions="Center" />
-                    <Label Text="Double-Sided Calendar" VerticalOptions="Center" />
+                    <CheckBox IsChecked="{Binding DoubleSidedEnabled}" 
+                              VerticalOptions="Center" />
+                    <Label Text="Double-Sided Calendar" 
+                           VerticalOptions="Center" />
                 </HorizontalStackLayout>
 
                 <BoxView HeightRequest="1" Color="#DDD" />
                 <Label Text="Export" FontAttributes="Bold" />
-                <Button Text="Export Month (PDF)" x:Name="ExportBtn" />
-                <Button Text="Export Cover (PDF)" x:Name="ExportCoverBtn" />
-                <Button Text="Export Full Year (PDF)" x:Name="ExportYearBtn" />
-                <Button Text="Export Double-Sided (PDF)" x:Name="ExportDoubleSidedBtn" />
-                <Button Text="Back" x:Name="BackBtn" />
+                <Button Text="Export Month (PDF)" 
+                        Command="{Binding ExportCurrentPageCommand}" />
+                <Button Text="Export Cover (PDF)" 
+                        Command="{Binding ExportCoverCommand}" />
+                <Button Text="Export Full Year (PDF)" 
+                        Command="{Binding ExportYearCommand}" />
+                <Button Text="Export Double-Sided (PDF)" 
+                        Command="{Binding ExportDoubleSidedCommand}" />
+                <Button Text="Back" 
+                        Command="{Binding GoBackCommand}" />
             </VerticalStackLayout>
         </ScrollView>
         <Border Grid.Column="1" Stroke="LightGray" StrokeThickness="1" Padding="8">

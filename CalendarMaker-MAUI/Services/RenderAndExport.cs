@@ -27,6 +27,14 @@ public interface IPdfExportService
 public sealed class PdfExportService : IPdfExportService
 {
     private const float TargetDpi = 300f; // 300 DPI print quality
+    private readonly ILayoutCalculator _layoutCalculator;
+    private readonly IImageProcessor _imageProcessor;
+
+    public PdfExportService(ILayoutCalculator layoutCalculator, IImageProcessor imageProcessor)
+    {
+        _layoutCalculator = layoutCalculator;
+        _imageProcessor = imageProcessor;
+    }
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
         => RenderDocumentAsync(project, new[] { (monthIndex, false, false) }, null, default);
@@ -253,7 +261,7 @@ public sealed class PdfExportService : IPdfExportService
             sk.Translate(-topHalf.MidX, -topHalf.MidY);
 
             var backLayout = project.BackCoverPhotoLayout;
-            var backSlots = ComputePhotoSlots(topHalf, backLayout);
+            var backSlots = _layoutCalculator.ComputePhotoSlots(topHalf, backLayout);
             foreach (var (rect, slotIndex) in backSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -261,7 +269,7 @@ public sealed class PdfExportService : IPdfExportService
                 var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -273,7 +281,7 @@ public sealed class PdfExportService : IPdfExportService
 
             // Draw front cover in bottom half (normal orientation within the already-rotated page)
             var frontLayout = project.FrontCoverPhotoLayout;
-            var frontSlots = ComputePhotoSlots(bottomHalf, frontLayout);
+            var frontSlots = _layoutCalculator.ComputePhotoSlots(bottomHalf, frontLayout);
             foreach (var (rect, slotIndex) in frontSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -281,7 +289,7 @@ public sealed class PdfExportService : IPdfExportService
                 var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -293,7 +301,7 @@ public sealed class PdfExportService : IPdfExportService
         else
         {
             // Regular page: photo on one side, calendar on the other
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
 
             // Get photo layout for the photo month
             var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
@@ -301,7 +309,7 @@ public sealed class PdfExportService : IPdfExportService
                                 : project.LayoutSpec.PhotoLayout;
 
             // Draw photos
-            var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
+            var photoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, photoLayout);
             foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -333,7 +341,7 @@ public sealed class PdfExportService : IPdfExportService
 
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -504,21 +512,6 @@ public sealed class PdfExportService : IPdfExportService
         }, cancellationToken);
     }
 
-    private static int GetOptimalParallelism()
-    {
-        // Detect platform and optimize accordingly
-        int cores = Environment.ProcessorCount;
-
-#if ANDROID || IOS
-        // On mobile devices, use fewer threads to prevent overheating and battery drain
-        // Also helps with memory pressure on constrained devices
-        return Math.Min(cores, 4); // Cap at 4 threads on mobile
-#else
-        // On desktop, use all available cores
-        return cores;
-#endif
-    }
-
     private byte[] RenderPageToJpeg(CalendarProject project, int monthIndex, bool renderCover, bool renderBackCover, float pageWpt, float pageHpt, float targetDpi, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? imageCache = null)
     {
         // Points to pixels scale factor
@@ -556,7 +549,7 @@ public sealed class PdfExportService : IPdfExportService
         {
             // Front cover - support multiple photo slots
             var layout = project.FrontCoverPhotoLayout;
-            var slots = ComputePhotoSlots(contentRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
@@ -564,7 +557,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -577,7 +570,7 @@ public sealed class PdfExportService : IPdfExportService
         {
             // Back cover - support multiple photo slots
             var layout = project.BackCoverPhotoLayout;
-            var slots = ComputePhotoSlots(contentRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
@@ -585,7 +578,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -596,12 +589,12 @@ public sealed class PdfExportService : IPdfExportService
         }
         else
         {
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
             var layout = project.MonthPhotoLayouts.TryGetValue(monthIndex, out var perMonth)
                 ? perMonth
                 : project.LayoutSpec.PhotoLayout;
             sk.Save();
-            var slots = ComputePhotoSlots(photoRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
@@ -611,7 +604,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault();
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -630,94 +623,19 @@ public sealed class PdfExportService : IPdfExportService
         return data.ToArray();
     }
 
-    private static SKBitmap? GetOrLoadBitmap(string path, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? cache)
+    private static int GetOptimalParallelism()
     {
-        if (cache == null)
-        {
-            // No caching, decode on demand
-            return SKBitmap.Decode(path);
-        }
+        // Detect platform and optimize accordingly
+        int cores = Environment.ProcessorCount;
 
-        // Thread-safe get-or-add
-        return cache.GetOrAdd(path, p => SKBitmap.Decode(p));
-    }
-
-    private static (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
-    {
-        float ratio = (float)Math.Clamp(spec.SplitRatio, 0.1, 0.9);
-        return spec.Placement switch
-        {
-            LayoutPlacement.PhotoLeftCalendarRight =>
-                (new SKRect(area.Left, area.Top, area.Left + area.Width * ratio, area.Bottom),
-                 new SKRect(area.Left + area.Width * ratio, area.Top, area.Right, area.Bottom)),
-            LayoutPlacement.PhotoRightCalendarLeft =>
-                (new SKRect(area.Left + area.Width * (1 - ratio), area.Top, area.Right, area.Bottom),
-                 new SKRect(area.Left, area.Top, area.Left + area.Width * (1 - ratio), area.Bottom)),
-            LayoutPlacement.PhotoTopCalendarBottom =>
-                (new SKRect(area.Left, area.Top, area.Right, area.Top + area.Height * ratio),
-                 new SKRect(area.Left, area.Top + area.Height * ratio, area.Right, area.Bottom)),
-            LayoutPlacement.PhotoBottomCalendarTop =>
-                (new SKRect(area.Left, area.Top + area.Height * (1 - ratio), area.Right, area.Bottom),
-                 new SKRect(area.Left, area.Top, area.Right, area.Top + area.Height * (1 - ratio))),
-            _ => (area, area)
-        };
-    }
-
-    private static List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout)
-    {
-        const float gap = 4f;
-        var list = new List<SKRect>();
-        switch (layout)
-        {
-            case PhotoLayout.TwoVerticalSplit:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.Grid2x2:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.TwoHorizontalStack:
-                {
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.ThreeLeftStack:
-                {
-                    // 2 photos stacked vertically on left (taking 50% width), 1 photo on right (taking 50% width)
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.ThreeRightStack:
-                {
-                    // 1 photo on left (taking 50% width), 2 photos stacked vertically on right (taking 50% width)
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            default:
-                list.Add(area);
-                break;
-        }
-        return list;
+#if ANDROID || IOS
+        // On mobile devices, use fewer threads to prevent overheating and battery drain
+        // Also helps with memory pressure on constrained devices
+        return Math.Min(cores, 4); // Cap at 4 threads on mobile
+#else
+        // On desktop, use all available cores
+        return cores;
+#endif
     }
 
     private static void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)

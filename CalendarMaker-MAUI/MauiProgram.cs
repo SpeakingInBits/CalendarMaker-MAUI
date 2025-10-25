@@ -1,5 +1,4 @@
-﻿
-using CalendarMaker_MAUI.Services;
+﻿using CalendarMaker_MAUI.Services;
 using CalendarMaker_MAUI.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
@@ -29,9 +28,20 @@ public static class MauiProgram
         builder.Services.AddSingleton<IProjectStorageService, ProjectStorageService>();
         builder.Services.AddSingleton<IAssetService, AssetService>();
         builder.Services.AddSingleton<IPdfExportService, PdfExportService>();
+        
+        // Rendering services (Phase 2)
+        builder.Services.AddSingleton<ILayoutCalculator, LayoutCalculator>();
+        builder.Services.AddSingleton<ICalendarRenderer, CalendarRenderer>();
+        builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
+     
+        // Foundation services (Phase 1)
+        builder.Services.AddSingleton<IDialogService, DialogService>();
+        builder.Services.AddSingleton<INavigationService, NavigationService>();
+        builder.Services.AddSingleton<IFilePickerService, FilePickerService>();
 
         builder.Services.AddTransient<ProjectsViewModel>();
         builder.Services.AddTransient<Views.ProjectsPage>();
+        builder.Services.AddTransient<DesignerViewModel>();
         builder.Services.AddTransient<Views.DesignerPage>();
 
 #if DEBUG
