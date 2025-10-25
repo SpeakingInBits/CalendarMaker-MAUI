@@ -85,4 +85,12 @@
 	  </MauiXaml>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <EditorConfigFiles Remove="E:\Code\Projects\CalendarMaker-MAUI\CalendarMaker-MAUI\.editorconfig" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="E:\Code\Projects\CalendarMaker-MAUI\CalendarMaker-MAUI\.editorconfig" />
+	</ItemGroup>
+
 </Project>

@@ -2,7 +2,6 @@
   <Folder Name="/Solution Items/">
     <File Path=".mcp.json" />
     <File Path="README.md" />
-    <File Path="Spec.md" />
   </Folder>
   <Project Path="CalendarMaker-MAUI/CalendarMaker-MAUI.csproj">
     <Deploy Solution="Debug|*" />

@@ -25,7 +25,7 @@ public sealed class ProjectStorageService : IProjectStorageService
     public async Task<string> CreateProjectAsync(CalendarProject project)
     {
         project.Id = Guid.NewGuid().ToString("N");
-        var dir = Path.Combine(_root, project.Id);
+        string dir = Path.Combine(_root, project.Id);
         Directory.CreateDirectory(dir);
         await WriteProjectJsonAsync(dir, project);
         return project.Id;
@@ -34,15 +34,22 @@ public sealed class ProjectStorageService : IProjectStorageService
     public async Task<IReadOnlyList<CalendarProject>> GetProjectsAsync()
     {
         var result = new List<CalendarProject>();
-        if (!Directory.Exists(_root)) return result;
-        foreach (var dir in Directory.EnumerateDirectories(_root))
+        if (!Directory.Exists(_root))
         {
-            var json = Path.Combine(dir, "project.json");
+            return result;
+        }
+
+        foreach (string dir in Directory.EnumerateDirectories(_root))
+        {
+            string json = Path.Combine(dir, "project.json");
             if (File.Exists(json))
             {
-                var text = await File.ReadAllTextAsync(json);
+                string text = await File.ReadAllTextAsync(json);
                 var project = System.Text.Json.JsonSerializer.Deserialize<CalendarProject>(text);
-                if (project != null) result.Add(project);
+                if (project != null)
+                {
+                    result.Add(project);
+                }
             }
         }
         return result;
@@ -50,7 +57,7 @@ public sealed class ProjectStorageService : IProjectStorageService
 
     public Task DeleteProjectAsync(string projectId)
     {
-        var dir = Path.Combine(_root, projectId);
+        string dir = Path.Combine(_root, projectId);
         if (Directory.Exists(dir))
         {
             try { Directory.Delete(dir, recursive: true); }
@@ -61,7 +68,7 @@ public sealed class ProjectStorageService : IProjectStorageService
 
     public async Task UpdateProjectAsync(CalendarProject project)
     {
-        var dir = GetProjectDirectory(project.Id);
+        string dir = GetProjectDirectory(project.Id);
         Directory.CreateDirectory(dir);
         project.UpdatedUtc = DateTime.UtcNow;
         await WriteProjectJsonAsync(dir, project);
@@ -74,8 +81,8 @@ public sealed class ProjectStorageService : IProjectStorageService
 
     private static async Task WriteProjectJsonAsync(string dir, CalendarProject project)
     {
-        var jsonPath = Path.Combine(dir, "project.json");
-        var json = System.Text.Json.JsonSerializer.Serialize(project, new System.Text.Json.JsonSerializerOptions
+        string jsonPath = Path.Combine(dir, "project.json");
+        string json = System.Text.Json.JsonSerializer.Serialize(project, new System.Text.Json.JsonSerializerOptions
         {
             WriteIndented = true
         });

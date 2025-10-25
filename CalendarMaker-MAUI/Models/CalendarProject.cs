@@ -71,7 +71,7 @@ public sealed class CalendarProject
     /// Gets or sets the per-month photo layout overrides, where the key is the month index (0-11) relative to StartMonth.
     /// </summary>
     public Dictionary<int, PhotoLayout> MonthPhotoLayouts { get; set; } = new();
-    
+
     /// <summary>
     /// Gets or sets the photo layout for the front cover.
     /// </summary>

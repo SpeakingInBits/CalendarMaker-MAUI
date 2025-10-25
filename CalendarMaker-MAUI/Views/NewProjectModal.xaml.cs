@@ -35,11 +35,15 @@ public partial class NewProjectModal : ContentPage
             _ => "5x7 Landscape 50/50 (Photo Left)"
         };
 
-        var name = NameEntry.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(name)) name = "My Calendar";
+        string? name = NameEntry.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = "My Calendar";
+        }
+
         ProjectName = name;
 
-        if (int.TryParse(YearEntry.Text, out var year))
+        if (int.TryParse(YearEntry.Text, out int year))
         {
             Year = year;
         }

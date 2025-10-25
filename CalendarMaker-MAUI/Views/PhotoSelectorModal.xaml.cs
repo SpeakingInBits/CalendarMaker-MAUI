@@ -16,9 +16,9 @@ public partial class PhotoSelectorModal : ContentPage
     public PhotoSelectorModal(IEnumerable<ImageAsset> allPhotos, string slotDescription)
     {
         InitializeComponent();
-        
+
         PhotosCollectionView.ItemsSource = _photos;
-        
+
         // Update header text
         if (FindByName("HeaderLabel") is Label headerLabel)
         {
@@ -32,7 +32,7 @@ public partial class PhotoSelectorModal : ContentPage
 
         // Load photos
         LoadPhotos(allPhotos);
-        
+
         // Update status
         UpdateStatus();
     }
@@ -40,18 +40,18 @@ public partial class PhotoSelectorModal : ContentPage
     private void LoadPhotos(IEnumerable<ImageAsset> allPhotos)
     {
         _photos.Clear();
-        
+
         // Group by path to determine if unassigned version exists and if photo is in use
         var photosByPath = allPhotos.GroupBy(a => a.Path).ToList();
-        
+
         // Sort: not in use first, then by filename
         var sortedPhotos = photosByPath
-            .Select(group => 
+            .Select(group =>
             {
                 var representative = group.First();
-                var hasUnassigned = group.Any(a => a.Role == "unassigned");
-                var isInUse = group.Any(a => a.Role != "unassigned");
-                
+                bool hasUnassigned = group.Any(a => a.Role == "unassigned");
+                bool isInUse = group.Any(a => a.Role != "unassigned");
+
                 return new PhotoItem
                 {
                     Asset = representative,
@@ -65,7 +65,7 @@ public partial class PhotoSelectorModal : ContentPage
             .OrderBy(p => p.IsInUse) // Not in use first (false < true)
             .ThenBy(p => p.FileName) // Then alphabetically by filename
             .ToList();
-        
+
         foreach (var photo in sortedPhotos)
         {
             _photos.Add(photo);
@@ -88,7 +88,7 @@ public partial class PhotoSelectorModal : ContentPage
 
         // Set new selection
         _selectedPhoto = e.CurrentSelection?.FirstOrDefault() as PhotoItem;
-        
+
         if (_selectedPhoto != null)
         {
             _selectedPhoto.IsSelected = true;
@@ -133,13 +133,13 @@ public partial class PhotoSelectorModal : ContentPage
 public class PhotoItem : INotifyPropertyChanged
 {
     private bool _isSelected;
-    
+
     public ImageAsset? Asset { get; set; }
     public string? Path { get; set; }
     public string? FileName { get; set; }
     public bool IsUnassigned { get; set; }
     public bool IsInUse { get; set; }
-    
+
     public bool IsSelected
     {
         get => _isSelected;
@@ -164,7 +164,7 @@ public class PhotoItem : INotifyPropertyChanged
 public class PhotoSelectedEventArgs : EventArgs
 {
     public ImageAsset SelectedAsset { get; }
-    
+
     public PhotoSelectedEventArgs(ImageAsset selectedAsset)
     {
         SelectedAsset = selectedAsset;
