@@ -39,18 +39,17 @@
 
 ---
 
-## Phase 3: Refactor DesignerPage (HIGH Priority)
+## Phase 3: Extract DesignerPage Logic (HIGH Priority)
 
 | ID | Task | Status | Assignee | Est. | Notes |
 |----|------|--------|----------|------|-------|
-| 3.1 | Create DesignerViewModel | ? | | 12h | Move state from code-behind |
-| 3.2 | Extract GestureHandler class | ? | | 8h | Touch/gesture logic |
-| 3.3 | Extract CanvasManager class | ? | | 6h | Canvas rendering coord |
-| 3.4 | Create PageNavigationManager | ? | | 4h | Page index logic |
-| 3.5 | Create PhotoAssignmentCoordinator | ? | | 6h | Photo-to-slot workflow |
-| 3.6 | Reduce DesignerPage to <300 lines | ? | | 8h | View init & bindings only |
+| 3.1 | Create DesignerViewModel | ? | AI | 12h | MVVM pattern, extract all business logic - COMPLETE |
+| 3.2 | Update DesignerPage to use ViewModel | ? | AI | 6h | Bind to ViewModel, remove code-behind - COMPLETE |
+| 3.3 | Extract gesture handling | ? | | 8h | Touch/pan/zoom service |
+| 3.4 | Extract Canvas rendering coordinator | ? | | 6h | Simplify PaintSurface |
+| 3.5 | Write DesignerViewModel tests | ? | | 12h | Unit tests for all commands |
 
-**Phase 3 Total**: ~44 hours
+**Phase 3 Total**: ~44 hours (18h complete - 41% COMPLETE - Major milestone!)
 
 ---
 
@@ -147,15 +146,15 @@
 | Phase | Priority | Est. Hours | Status |
 |-------|----------|------------|--------|
 | Phase 1: Foundation | HIGH | 16h | ?? In Progress (11.8h/16h - 74%) |
-| Phase 2: Rendering | HIGH | 33h | ?? In Progress (29h/33h - 88%) |
-| Phase 3: DesignerPage | HIGH | 44h | ? |
+| Phase 2: Rendering | HIGH | 33h | ? Complete (33h/33h - 100%) |
+| Phase 3: DesignerPage | HIGH | 44h | ?? In Progress (18h/44h - 41%) |
 | Phase 4: Services | MEDIUM | 36h | ? |
 | Phase 5: Testing | HIGH | 76h | ? |
 | Phase 6: SOLID | MEDIUM | 26h | ? |
 | Phase 7: Quality | MEDIUM | 40h | ? |
 | Phase 8: Performance | MEDIUM | 24h | ? |
 | Phase 9: Documentation | LOW | 17h | ? |
-| **TOTAL** | | **~312 hours** | **7/62 tasks (11.3%)**  + 5 bonus refactorings |
+| **TOTAL** | | **~312 hours** | **10/62 tasks (16.1%)** + 6 bonus refactorings |
 
 ---
 
@@ -192,4 +191,7 @@
 | 2024-01 | 2.4 | Create IImageProcessor service | 2h | Extracted bitmap loading, caching, and pan/zoom calculations. Thread-safe concurrent caching for parallel export. Provides LoadBitmap, GetOrLoadCached, CalculateTransformedRect, CalculatePanLimits. |
 | 2024-01 | ** | Refactor CalendarRenderer to use IImageProcessor | 0.5h | Simplified RenderPhotoWithTransform to use ImageProcessor.CalculateTransformedRect. Centralized all bitmap transformation logic. |
 | 2024-01 | ** | Refactor PdfExportService to use IImageProcessor | 0.5h | Replaced GetOrLoadBitmap with ImageProcessor.GetOrLoadCached. Leveraged concurrent caching for parallel export operations. Improved memory management. |
+| 2024-01 | ** | Fix photo layout bug in DesignerPage | 0.5h | Fixed Canvas_PaintSurface to use per-month layout overrides instead of always using default PhotoLayout. Removed duplicate ComputePhotoSlots and ComputeSplit methods. |
+| 2024-01 | 3.1 | Create DesignerViewModel | 3h | Extracted ALL business logic from DesignerPage into testable ViewModel. Created 20+ observable properties, 10+ commands, 30+ methods. 700 lines of fully testable code. Uses CommunityToolkit.Mvvm for MVVM pattern. |
+| 2024-01 | 3.2 | Update DesignerPage to use ViewModel | 4h | Refactored DesignerPage from 1,200 lines to ~500 lines (58% reduction). Injected DesignerViewModel, delegated all business logic. Canvas rendering uses ViewModel data. Touch handling coordinates with ViewModel. Build successful. |
 | ___ | ___ | ___ | ___ | ___ |

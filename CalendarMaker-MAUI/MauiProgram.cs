@@ -41,6 +41,7 @@ public static class MauiProgram
 
         builder.Services.AddTransient<ProjectsViewModel>();
         builder.Services.AddTransient<Views.ProjectsPage>();
+        builder.Services.AddTransient<DesignerViewModel>();
         builder.Services.AddTransient<Views.DesignerPage>();
 
 #if DEBUG
