@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  x:Class="CalendarMaker_MAUI.Views.ProjectSettingsModal"
+      Title="Project Settings">
+    <Grid RowDefinitions="*,Auto" Padding="20">
+   <ScrollView Grid.Row="0">
+   <VerticalStackLayout Spacing="20">
+         <Label Text="Project Settings" 
+         FontSize="24" 
+                FontAttributes="Bold" />
+
+            <!-- Margins Section -->
+   <VerticalStackLayout Spacing="10">
+        <Label Text="Page Margins (inches)" 
+           FontSize="18" 
+     FontAttributes="Bold" />
+       <Label Text="Adjust the margins around the calendar content. 1 inch = 72 points." 
+            FontSize="12" 
+           TextColor="Gray" />
+
+     <!-- Top Margin -->
+           <Grid ColumnDefinitions="100,*,60" ColumnSpacing="10">
+    <Label Text="Top" VerticalOptions="Center" />
+          <Slider x:Name="TopMarginSlider" 
+         Grid.Column="1"
+     Minimum="0" 
+           Maximum="1.0" 
+   VerticalOptions="Center" />
+   <Label Grid.Column="2" 
+           Text="{Binding Source={x:Reference TopMarginSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+         </Grid>
+
+ <!-- Bottom Margin -->
+   <Grid ColumnDefinitions="100,*,60" ColumnSpacing="10">
+       <Label Text="Bottom" VerticalOptions="Center" />
+    <Slider x:Name="BottomMarginSlider" 
+        Grid.Column="1"
+             Minimum="0" 
+          Maximum="1.0" 
+      VerticalOptions="Center" />
+         <Label Grid.Column="2" 
+       Text="{Binding Source={x:Reference BottomMarginSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+            VerticalOptions="Center" />
+     </Grid>
+
+        <!-- Left Margin -->
+       <Grid ColumnDefinitions="100,*,60" ColumnSpacing="10">
+         <Label Text="Left" VerticalOptions="Center" />
+            <Slider x:Name="LeftMarginSlider" 
+         Grid.Column="1"
+       Minimum="0" 
+             Maximum="1.0" 
+           VerticalOptions="Center" />
+  <Label Grid.Column="2" 
+     Text="{Binding Source={x:Reference LeftMarginSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+         VerticalOptions="Center" />
+  </Grid>
+
+         <!-- Right Margin -->
+           <Grid ColumnDefinitions="100,*,60" ColumnSpacing="10">
+      <Label Text="Right" VerticalOptions="Center" />
+     <Slider x:Name="RightMarginSlider" 
+    Grid.Column="1"
+     Minimum="0" 
+       Maximum="1.0" 
+    VerticalOptions="Center" />
+      <Label Grid.Column="2" 
+     Text="{Binding Source={x:Reference RightMarginSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+        VerticalOptions="Center" />
+ </Grid>
+
+ <Button Text="Reset to Default (0.2 in)" 
+   x:Name="ResetMarginsBtn"
+        HorizontalOptions="Start" />
+       </VerticalStackLayout>
+
+      <BoxView HeightRequest="1" Color="LightGray" />
+
+        <!-- Additional Settings Section (Future) -->
+    <VerticalStackLayout Spacing="10">
+      <Label Text="Theme and Colors" 
+     FontSize="18" 
+       FontAttributes="Bold" />
+        <Label Text="Additional theme settings coming soon..." 
+     FontSize="12" 
+      TextColor="Gray" 
+      FontAttributes="Italic" />
+                </VerticalStackLayout>
+     </VerticalStackLayout>
+        </ScrollView>
+
+ <!-- Action Buttons -->
+        <Grid Grid.Row="1" 
+              ColumnDefinitions="*,*" 
+       ColumnSpacing="10" 
+         Margin="0,20,0,0">
+       <Button Text="Cancel" 
+       x:Name="CancelBtn"
+Grid.Column="0" />
+            <Button Text="Apply" 
+              x:Name="ApplyBtn"
+      Grid.Column="1" 
+       BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+            TextColor="White" />
+        </Grid>
+    </Grid>
+</ContentPage>

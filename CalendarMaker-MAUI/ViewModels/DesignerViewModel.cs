@@ -115,6 +115,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     public ICommand NavigatePageCommand { get; }
     public ICommand ImportPhotosCommand { get; }
     public ICommand ShowPhotoSelectorCommand { get; }
+    public ICommand ShowProjectSettingsCommand { get; }
     public ICommand FlipLayoutCommand { get; }
     public ICommand ExportCurrentPageCommand { get; }
     public ICommand ExportCoverCommand { get; }
@@ -170,6 +171,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         NavigatePageCommand = new RelayCommand<int>(NavigatePage);
         ImportPhotosCommand = new AsyncRelayCommand(ImportPhotosAsync);
         ShowPhotoSelectorCommand = new AsyncRelayCommand(ShowPhotoSelectorAsync);
+        ShowProjectSettingsCommand = new AsyncRelayCommand(ShowProjectSettingsAsync);
         FlipLayoutCommand = new RelayCommand(FlipLayout);
         ExportCurrentPageCommand = new AsyncRelayCommand(ExportCurrentPageAsync);
         ExportCoverCommand = new AsyncRelayCommand(ExportCoverAsync);
@@ -375,15 +377,42 @@ public sealed partial class DesignerViewModel : ObservableObject
      };
 
         modal.RemoveRequested += async (_, __) =>
-     {
-         if (Project == null)
-         {
-             return;
-         }
+           {
+               if (Project == null)
+               {
+                   return;
+               }
 
-         await RemovePhotoFromActiveSlotAsync();
-         await _navigationService.PopModalAsync();
-     };
+               await RemovePhotoFromActiveSlotAsync();
+               await _navigationService.PopModalAsync();
+           };
+
+        modal.Cancelled += async (_, __) =>
+        {
+            await _navigationService.PopModalAsync();
+        };
+
+        await _navigationService.PushModalAsync(modal, true);
+    }
+
+    private async Task ShowProjectSettingsAsync()
+    {
+        if (Project == null)
+        {
+            return;
+        }
+
+        var modal = new Views.ProjectSettingsModal(Project);
+
+        modal.Applied += async (_, __) =>
+        {
+            // Save the updated project
+            await _storage.UpdateProjectAsync(Project);
+            await _navigationService.PopModalAsync();
+
+            // Trigger canvas refresh by notifying a property change
+            OnPropertyChanged(nameof(Project));
+        };
 
         modal.Cancelled += async (_, __) =>
         {
@@ -457,39 +486,39 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     private async Task ExportYearAsync()
     {
-  if (Project == null)
+        if (Project == null)
         {
-    return;
+            return;
         }
 
-   await ExportWithProgressAsync(
-            async (progress, ct) => await _pdf.ExportYearAsync(Project, includeCover: true, progress, ct),
-  $"Calendar_{Project.Year}_FullYear.pdf"
-      );
+        await ExportWithProgressAsync(
+                 async (progress, ct) => await _pdf.ExportYearAsync(Project, includeCover: true, progress, ct),
+       $"Calendar_{Project.Year}_FullYear.pdf"
+           );
     }
 
     private async Task ExportDoubleSidedAsync()
     {
         if (Project == null)
-   {
+        {
             return;
-  }
+        }
 
- await ExportWithProgressAsync(
-   async (progress, ct) => await _pdf.ExportDoubleSidedAsync(Project, progress, ct),
-        $"Calendar_{Project.Year}_DoubleSided.pdf"
-        );
- }
+        await ExportWithProgressAsync(
+          async (progress, ct) => await _pdf.ExportDoubleSidedAsync(Project, progress, ct),
+               $"Calendar_{Project.Year}_DoubleSided.pdf"
+               );
+    }
 
     private async Task ExportWithProgressAsync(
         Func<IProgress<ExportProgress>, CancellationToken, Task<byte[]>> exportFunc,
         string fileName)
     {
-     var modal = new Views.ExportProgressModal();
+        var modal = new Views.ExportProgressModal();
         var cts = new CancellationTokenSource();
-   modal.SetCancellationTokenSource(cts);
+        modal.SetCancellationTokenSource(cts);
 
-     bool cancelled = false;
+        bool cancelled = false;
         modal.Cancelled += (_, __) => cancelled = true;
 
         await _navigationService.PushModalAsync(modal, true);
@@ -499,18 +528,18 @@ public sealed partial class DesignerViewModel : ObservableObject
             var progress = new Progress<ExportProgress>(p => modal.UpdateProgress(p));
             var bytes = await exportFunc(progress, cts.Token);
 
-      if (!cancelled)
- {
-       await SaveBytesAsync(fileName, bytes);
-    }
+            if (!cancelled)
+            {
+                await SaveBytesAsync(fileName, bytes);
+            }
         }
-    catch (OperationCanceledException)
+        catch (OperationCanceledException)
         {
             // User cancelled the export
-    }
-finally
+        }
+        finally
         {
-       await _navigationService.PopModalAsync();
+            await _navigationService.PopModalAsync();
         }
     }
     private void ResetSplit()
