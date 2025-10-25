@@ -457,30 +457,62 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     private async Task ExportYearAsync()
     {
-        if (Project == null)
+  if (Project == null)
         {
-            return;
+    return;
         }
 
-        // TODO: Implement progress modal
-        var bytes = await _pdf.ExportYearAsync(Project, includeCover: true);
-        var fileName = $"Calendar_{Project.Year}_FullYear.pdf";
-        await SaveBytesAsync(fileName, bytes);
+   await ExportWithProgressAsync(
+            async (progress, ct) => await _pdf.ExportYearAsync(Project, includeCover: true, progress, ct),
+  $"Calendar_{Project.Year}_FullYear.pdf"
+      );
     }
 
     private async Task ExportDoubleSidedAsync()
     {
         if (Project == null)
-        {
+   {
             return;
-        }
+  }
 
-        // TODO: Implement progress modal
-        var bytes = await _pdf.ExportDoubleSidedAsync(Project);
-        var fileName = $"Calendar_{Project.Year}_DoubleSided.pdf";
-        await SaveBytesAsync(fileName, bytes);
+ await ExportWithProgressAsync(
+   async (progress, ct) => await _pdf.ExportDoubleSidedAsync(Project, progress, ct),
+        $"Calendar_{Project.Year}_DoubleSided.pdf"
+        );
+ }
+
+    private async Task ExportWithProgressAsync(
+        Func<IProgress<ExportProgress>, CancellationToken, Task<byte[]>> exportFunc,
+        string fileName)
+    {
+     var modal = new Views.ExportProgressModal();
+        var cts = new CancellationTokenSource();
+   modal.SetCancellationTokenSource(cts);
+
+     bool cancelled = false;
+        modal.Cancelled += (_, __) => cancelled = true;
+
+        await _navigationService.PushModalAsync(modal, true);
+
+        try
+        {
+            var progress = new Progress<ExportProgress>(p => modal.UpdateProgress(p));
+            var bytes = await exportFunc(progress, cts.Token);
+
+      if (!cancelled)
+ {
+       await SaveBytesAsync(fileName, bytes);
     }
-
+        }
+    catch (OperationCanceledException)
+        {
+            // User cancelled the export
+    }
+finally
+        {
+       await _navigationService.PopModalAsync();
+        }
+    }
     private void ResetSplit()
     {
         if (Project == null)
