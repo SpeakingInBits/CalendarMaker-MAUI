@@ -49,17 +49,17 @@ public partial class DesignerPage : ContentPage
 
         // Subscribe to ViewModel property changes that require canvas refresh
         _viewModel.PropertyChanged += (s, e) =>
-           {
-               if (e.PropertyName == nameof(DesignerViewModel.PageIndex) ||
-                      e.PropertyName == nameof(DesignerViewModel.Project) ||
-            e.PropertyName == nameof(DesignerViewModel.SplitRatio) ||
+        {
+            if (e.PropertyName == nameof(DesignerViewModel.PageIndex) ||
+                e.PropertyName == nameof(DesignerViewModel.Project) ||
+                e.PropertyName == nameof(DesignerViewModel.SplitRatio) ||
                 e.PropertyName == nameof(DesignerViewModel.ZoomValue) ||
-                           e.PropertyName == nameof(DesignerViewModel.SelectedPhotoLayoutIndex) ||
-                     e.PropertyName == nameof(DesignerViewModel.BorderlessChecked))
-               {
-                   _canvas.InvalidateSurface();
-               }
-           };
+                e.PropertyName == nameof(DesignerViewModel.SelectedPhotoLayoutIndex) ||
+                e.PropertyName == nameof(DesignerViewModel.BorderlessChecked))
+            {
+                _canvas.InvalidateSurface();
+            }
+        };
     }
 
     protected override async void OnAppearing()
@@ -102,9 +102,9 @@ public partial class DesignerPage : ContentPage
             pageHpt = 792;
         }
 
-        var scale = Math.Min(e.Info.Width / (float)pageWpt, e.Info.Height / (float)pageHpt);
-        var offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
-        var offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
+        float scale = (float)Math.Min(e.Info.Width / (float)pageWpt, e.Info.Height / (float)pageHpt);
+        float offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
+        float offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
 
         _pageScale = scale;
         _pageOffsetX = offsetX;
@@ -112,7 +112,7 @@ public partial class DesignerPage : ContentPage
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
-        canvas.Scale((float)scale);
+        canvas.Scale(scale);
 
         // Draw page border
         var pageRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
@@ -120,12 +120,12 @@ public partial class DesignerPage : ContentPage
         {
             Color = SKColors.LightGray,
             Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1f / (float)scale
+            StrokeWidth = 1f / scale
         };
         canvas.DrawRect(pageRect, pageBorder);
 
         // Calculate content rect
-        var contentRect = CalculateContentRect(project, pageWpt, pageHpt);
+        SKRect contentRect = CalculateContentRect(project, pageWpt, pageHpt);
 
         // Draw content border if not borderless
         if (!IsBorderless(project))
@@ -134,7 +134,7 @@ public partial class DesignerPage : ContentPage
             {
                 Color = SKColors.Silver,
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1f / (float)scale
+                StrokeWidth = 1f / scale
             };
             canvas.DrawRect(contentRect, contentBorder);
         }
@@ -147,10 +147,10 @@ public partial class DesignerPage : ContentPage
 
     private SKRect CalculateContentRect(CalendarProject project, double pageWpt, double pageHpt)
     {
-        var m = project.Margins;
+        Margins m = project.Margins;
         SKRect contentRect;
 
-        var pageIndex = _viewModel.PageIndex;
+        int pageIndex = _viewModel.PageIndex;
 
         if (pageIndex == -1 && project.CoverSpec.BorderlessFrontCover)
         {
@@ -163,10 +163,10 @@ public partial class DesignerPage : ContentPage
         else
         {
             contentRect = new SKRect(
-            (float)m.LeftPt,
-       (float)m.TopPt,
-         (float)pageWpt - (float)m.RightPt,
-         (float)pageHpt - (float)m.BottomPt);
+                (float)m.LeftPt,
+                (float)m.TopPt,
+                (float)pageWpt - (float)m.RightPt,
+                (float)pageHpt - (float)m.BottomPt);
         }
 
         // Handle double-sided cover rendering
@@ -176,19 +176,19 @@ public partial class DesignerPage : ContentPage
             {
                 // Front cover - bottom half
                 contentRect = new SKRect(
-                     contentRect.Left,
-                       contentRect.MidY + 2f,
-                contentRect.Right,
-                contentRect.Bottom);
+                    contentRect.Left,
+                    contentRect.MidY + 2f,
+                    contentRect.Right,
+                    contentRect.Bottom);
             }
             else
             {
                 // Back cover - top half
                 contentRect = new SKRect(
-              contentRect.Left,
-             contentRect.Top,
-                 contentRect.Right,
-                contentRect.MidY - 2f);
+                    contentRect.Left,
+                    contentRect.Top,
+                    contentRect.Right,
+                    contentRect.MidY - 2f);
             }
         }
 
@@ -197,94 +197,94 @@ public partial class DesignerPage : ContentPage
 
     private bool IsBorderless(CalendarProject project)
     {
-        var pageIndex = _viewModel.PageIndex;
+        int pageIndex = _viewModel.PageIndex;
         return (pageIndex == -1 && project.CoverSpec.BorderlessFrontCover) ||
-          (pageIndex == 12 && project.CoverSpec.BorderlessBackCover);
+               (pageIndex == 12 && project.CoverSpec.BorderlessBackCover);
     }
 
     private void RenderPageContent(SKCanvas canvas, CalendarProject project, SKRect contentRect)
     {
-        var pageIndex = _viewModel.PageIndex;
-        var activeSlotIndex = _viewModel.ActiveSlotIndex;
+        int pageIndex = _viewModel.PageIndex;
+        int activeSlotIndex = _viewModel.ActiveSlotIndex;
         List<SKRect> photoSlots;
         SKRect photoRect;
 
         if (pageIndex == -1) // Front cover
         {
-            var layout = project.FrontCoverPhotoLayout;
+            PhotoLayout layout = project.FrontCoverPhotoLayout;
             photoSlots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             photoRect = contentRect;
 
             _viewModel.UpdateCachedRenderingData(photoSlots, photoRect, contentRect);
 
             _calendarRenderer.RenderPhotoSlots(
-                  canvas,
-                            photoSlots,
-                 project.ImageAssets.ToList(),
-                   "coverPhoto",
-                            null,
-                    activeSlotIndex);
+                canvas,
+                photoSlots,
+                project.ImageAssets.ToList(),
+                "coverPhoto",
+                null,
+                activeSlotIndex);
         }
         else if (pageIndex == -2) // Previous December
         {
-            (photoRect, var calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
 
             int decemberIndex = project.StartMonth == 1 ? 11 : 12 - project.StartMonth;
-            var layout = project.MonthPhotoLayouts.TryGetValue(decemberIndex, out var perMonth)
-              ? perMonth
-        : project.LayoutSpec.PhotoLayout;
+            PhotoLayout layout = project.MonthPhotoLayouts.TryGetValue(decemberIndex, out PhotoLayout perMonth)
+                ? perMonth
+                : project.LayoutSpec.PhotoLayout;
 
             photoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             _viewModel.UpdateCachedRenderingData(photoSlots, photoRect, contentRect);
 
             _calendarRenderer.RenderPhotoSlots(
-        canvas,
-          photoSlots,
-          project.ImageAssets.ToList(),
-         "monthPhoto",
-           _viewModel.PageIndex,
-             activeSlotIndex);
+                canvas,
+                photoSlots,
+                project.ImageAssets.ToList(),
+                "monthPhoto",
+                _viewModel.PageIndex,
+                activeSlotIndex);
 
             // Draw calendar for previous year
             _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12);
         }
         else if (pageIndex == 12) // Back cover
         {
-            var layout = project.BackCoverPhotoLayout;
+            PhotoLayout layout = project.BackCoverPhotoLayout;
             photoSlots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             photoRect = contentRect;
 
             _viewModel.UpdateCachedRenderingData(photoSlots, photoRect, contentRect);
 
             _calendarRenderer.RenderPhotoSlots(
-              canvas,
-          photoSlots,
-                  project.ImageAssets.ToList(),
-            "backCoverPhoto",
-          null,
-         activeSlotIndex);
+                canvas,
+                photoSlots,
+                project.ImageAssets.ToList(),
+                "backCoverPhoto",
+                null,
+                activeSlotIndex);
         }
         else // Month page
         {
-            (photoRect, var calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
 
-            var layout = project.MonthPhotoLayouts.TryGetValue(pageIndex, out var perMonth)
-                  ? perMonth
-               : project.LayoutSpec.PhotoLayout;
+            PhotoLayout layout = project.MonthPhotoLayouts.TryGetValue(pageIndex, out PhotoLayout perMonth)
+                ? perMonth
+                : project.LayoutSpec.PhotoLayout;
 
             photoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             _viewModel.UpdateCachedRenderingData(photoSlots, photoRect, contentRect);
 
             _calendarRenderer.RenderPhotoSlots(
-           canvas,
-          photoSlots,
-         project.ImageAssets.ToList(),
-              "monthPhoto",
-       pageIndex,
-           activeSlotIndex);
+                canvas,
+                photoSlots,
+                project.ImageAssets.ToList(),
+                "monthPhoto",
+                pageIndex,
+                activeSlotIndex);
 
-            var month = ((project.StartMonth - 1 + pageIndex) % 12) + 1;
-            var year = project.Year + (project.StartMonth - 1 + pageIndex) / 12;
+            int month = ((project.StartMonth - 1 + pageIndex) % 12) + 1;
+            int year = project.Year + (project.StartMonth - 1 + pageIndex) / 12;
             _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, year, month);
         }
     }
@@ -295,18 +295,18 @@ public partial class DesignerPage : ContentPage
 
     private void OnCanvasTouch(object? sender, SKTouchEventArgs e)
     {
-        var project = _viewModel.Project;
+        CalendarProject? project = _viewModel.Project;
         if (project == null)
         {
             return;
         }
 
-        var loc = e.Location;
+        SKPoint loc = e.Location;
         float density = 1f;
 
         try
         {
-            var canvasSize = _canvas.CanvasSize;
+            SKSize canvasSize = _canvas.CanvasSize;
             if (_canvas.Width > 0)
             {
                 density = (float)(canvasSize.Width / _canvas.Width);
@@ -314,14 +314,14 @@ public partial class DesignerPage : ContentPage
         }
         catch { }
 
-        var touchPx = new SKPoint(loc.X * density, loc.Y * density);
-        var pagePt = new SKPoint(
+        SKPoint touchPx = new SKPoint(loc.X * density, loc.Y * density);
+        SKPoint pagePt = new SKPoint(
             (touchPx.X - _pageOffsetX) / _pageScale,
-(touchPx.Y - _pageOffsetY) / _pageScale);
+            (touchPx.Y - _pageOffsetY) / _pageScale);
 
-        var pageIndex = _viewModel.PageIndex;
-        var isCover = pageIndex == -1 || pageIndex == 12;
-        var hitRect = isCover ? _viewModel.LastContentRect : _viewModel.LastPhotoRect;
+        int pageIndex = _viewModel.PageIndex;
+        bool isCover = pageIndex == -1 || pageIndex == 12;
+        SKRect hitRect = isCover ? _viewModel.LastContentRect : _viewModel.LastPhotoRect;
 
         switch (e.ActionType)
         {
@@ -356,25 +356,25 @@ public partial class DesignerPage : ContentPage
     {
         _viewModel.IsPointerDown = true;
 
-        var hitIdx = HitTestSlot(pagePt);
+        int hitIdx = HitTestSlot(pagePt);
         if (hitIdx >= 0 && hitIdx != _viewModel.ActiveSlotIndex)
         {
             _viewModel.ActiveSlotIndex = hitIdx;
             _canvas.InvalidateSurface();
         }
 
-        var targetRect = GetCurrentTargetRect(hitRect);
-        var asset = _viewModel.GetActiveAsset();
+        SKRect targetRect = GetCurrentTargetRect(hitRect);
+        ImageAsset? asset = _viewModel.GetActiveAsset();
 
         _viewModel.PressedOnAsset = targetRect.Contains(pagePt) && asset != null && File.Exists(asset.Path);
         _viewModel.DragStartPagePoint = pagePt;
 
         if (_viewModel.PressedOnAsset && asset != null)
         {
-            using var bmp = SKBitmap.Decode(asset.Path);
+            using SKBitmap? bmp = SKBitmap.Decode(asset.Path);
             if (bmp != null)
             {
-                var (excessX, excessY) = CalculateDragExcess(bmp, targetRect, asset);
+                (float excessX, float excessY) = CalculateDragExcess(bmp, targetRect, asset);
                 _viewModel.DragExcessX = excessX;
                 _viewModel.DragExcessY = excessY;
                 _viewModel.StartPanX = asset.PanX;
@@ -391,14 +391,14 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
-        var asset = _viewModel.GetActiveAsset();
+        ImageAsset? asset = _viewModel.GetActiveAsset();
         if (asset == null)
         {
             return;
         }
 
-        var dx = pagePt.X - _viewModel.DragStartPagePoint.X;
-        var dy = pagePt.Y - _viewModel.DragStartPagePoint.Y;
+        float dx = pagePt.X - _viewModel.DragStartPagePoint.X;
+        float dy = pagePt.Y - _viewModel.DragStartPagePoint.Y;
 
         if (!_viewModel.IsDragging)
         {
@@ -429,12 +429,12 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
-        var targetRect = GetCurrentTargetRect(hitRect);
+        SKRect targetRect = GetCurrentTargetRect(hitRect);
         if (targetRect.Contains(pagePt))
         {
-            var now = DateTime.UtcNow;
+            DateTime now = DateTime.UtcNow;
             if ((now - _viewModel.LastTapAt).TotalMilliseconds < 300 &&
-        SKPoint.Distance(pagePt, _viewModel.LastTapPoint) < 10)
+                SKPoint.Distance(pagePt, _viewModel.LastTapPoint) < 10)
             {
                 // Execute command using Task.Run to avoid async warning
                 _ = Task.Run(async () => await ((AsyncRelayCommand)_viewModel.ShowPhotoSelectorCommand).ExecuteAsync(null));
@@ -447,7 +447,7 @@ public partial class DesignerPage : ContentPage
 
     private int HitTestSlot(SKPoint pt)
     {
-        var slots = _viewModel.LastPhotoSlots;
+        List<SKRect> slots = _viewModel.LastPhotoSlots;
         if (slots.Count == 0)
         {
             return -1;
@@ -458,44 +458,30 @@ public partial class DesignerPage : ContentPage
 
     private SKRect GetCurrentTargetRect(SKRect fallback)
     {
-        var slots = _viewModel.LastPhotoSlots;
-        var activeIndex = _viewModel.ActiveSlotIndex;
+        List<SKRect> slots = _viewModel.LastPhotoSlots;
+        int activeIndex = _viewModel.ActiveSlotIndex;
 
         return slots.Count > activeIndex ? slots[activeIndex] : fallback;
     }
 
     private (float excessX, float excessY) CalculateDragExcess(SKBitmap bmp, SKRect rect, ImageAsset asset)
     {
-        var imgW = (float)bmp.Width;
-        var imgH = (float)bmp.Height;
-        var rectW = rect.Width;
-        var rectH = rect.Height;
-        var imgAspect = imgW / imgH;
-        var rectAspect = rectW / rectH;
+        float imgW = bmp.Width;
+        float imgH = bmp.Height;
+        float rectW = rect.Width;
+        float rectH = rect.Height;
+        float imgAspect = imgW / imgH;
+        float rectAspect = rectW / rectH;
 
         float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
         float scale = baseScale * (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
-        var targetW = imgW * scale;
-        var targetH = imgH * scale;
+        float targetW = imgW * scale;
+        float targetH = imgH * scale;
 
         return (
-     Math.Max(0, (targetW - rectW) / 2f),
+            Math.Max(0, (targetW - rectW) / 2f),
             Math.Max(0, (targetH - rectH) / 2f)
         );
-    }
-
-    #endregion
-
-    #region Tap Gesture Handlers (still in code-behind for now)
-
-    private void OnSplitResetTapped(object? sender, TappedEventArgs e)
-    {
-        _viewModel.ResetSplitCommand.Execute(null);
-    }
-
-    private void OnZoomResetTapped(object? sender, TappedEventArgs e)
-    {
-        _viewModel.ResetZoomCommand.Execute(null);
     }
 
     #endregion
@@ -503,40 +489,40 @@ public partial class DesignerPage : ContentPage
 #if WINDOWS
     private void OnCanvasKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
- var asset = _viewModel.GetActiveAsset();
+        ImageAsset? asset = _viewModel.GetActiveAsset();
         if (asset == null)
         {
             return;
         }
 
         double step = 0.05;
-    bool handled = false;
+        bool handled = false;
 
         switch (e.Key)
-    {
+        {
             case Windows.System.VirtualKey.Left:
-        asset.PanX = Math.Clamp(asset.PanX - step, -1, 1);
-          handled = true;
-       break;
-        case Windows.System.VirtualKey.Right:
-        asset.PanX = Math.Clamp(asset.PanX + step, -1, 1);
-     handled = true;
-       break;
- case Windows.System.VirtualKey.Up:
+                asset.PanX = Math.Clamp(asset.PanX - step, -1, 1);
+                handled = true;
+                break;
+            case Windows.System.VirtualKey.Right:
+                asset.PanX = Math.Clamp(asset.PanX + step, -1, 1);
+                handled = true;
+                break;
+            case Windows.System.VirtualKey.Up:
                 asset.PanY = Math.Clamp(asset.PanY - step, -1, 1);
                 handled = true;
-      break;
- case Windows.System.VirtualKey.Down:
-            asset.PanY = Math.Clamp(asset.PanY + step, -1, 1);
-   handled = true;
-           break;
+                break;
+            case Windows.System.VirtualKey.Down:
+                asset.PanY = Math.Clamp(asset.PanY + step, -1, 1);
+                handled = true;
+                break;
         }
 
         if (handled)
         {
-        _viewModel.SaveProjectCommand?.Execute(null);
+            _viewModel.SaveProjectCommand?.Execute(null);
             _canvas.InvalidateSurface();
-        e.Handled = true;
+            e.Handled = true;
         }
     }
 #endif
