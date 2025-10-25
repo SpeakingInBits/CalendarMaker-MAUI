@@ -29,6 +29,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAssetService, AssetService>();
         builder.Services.AddSingleton<IPdfExportService, PdfExportService>();
         builder.Services.AddSingleton<ILayoutCalculator, LayoutCalculator>();
+        builder.Services.AddSingleton<ICalendarRenderer, CalendarRenderer>();
         
         // Foundation services (Phase 1)
         builder.Services.AddSingleton<IDialogService, DialogService>();
