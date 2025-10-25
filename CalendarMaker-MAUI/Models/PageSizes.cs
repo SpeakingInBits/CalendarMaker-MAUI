@@ -32,13 +32,18 @@ public static class PageSizes
     public static (double widthPt, double heightPt) GetPoints(PageSpec spec)
     {
         if (spec.Size == PageSize.Custom && spec.CustomWidthPt.HasValue && spec.CustomHeightPt.HasValue)
+        {
             return (spec.CustomWidthPt.Value, spec.CustomHeightPt.Value);
+        }
 
         var (wIn, hIn) = GetInches(spec.Size);
-        var widthPt = wIn * 72.0;
-        var heightPt = hIn * 72.0;
+        double widthPt = wIn * 72.0;
+        double heightPt = hIn * 72.0;
         if (spec.Orientation == PageOrientation.Landscape)
+        {
             return (heightPt, widthPt);
+        }
+
         return (widthPt, heightPt);
     }
 }

@@ -5,7 +5,7 @@ namespace CalendarMaker_MAUI.Views;
 public partial class ExportProgressModal : ContentPage
 {
     private CancellationTokenSource? _cancellationTokenSource;
-    
+
     public event EventHandler? Cancelled;
 
     public ExportProgressModal()
@@ -36,4 +36,3 @@ public partial class ExportProgressModal : ContentPage
         Cancelled?.Invoke(this, EventArgs.Empty);
     }
 }
-

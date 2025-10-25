@@ -18,7 +18,7 @@ public sealed class TemplateDescriptor
 public sealed class TemplateService : ITemplateService
 {
     public const string DefaultTemplateKey = "PhotoMonthlyClassic";
-    
+
     private readonly Dictionary<string, TemplateDescriptor> _templates = new();
 
     public TemplateService()

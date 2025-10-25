@@ -44,7 +44,10 @@ public partial class ProjectsPage : ContentPage
 
         await Shell.Current.Navigation.PushModalAsync(modal);
         var result = await tcs.Task;
-        if (result is null) return;
+        if (result is null)
+        {
+            return;
+        }
 
         var (preset, name, year) = result.Value;
 
@@ -93,7 +96,7 @@ public partial class ProjectsPage : ContentPage
     {
         if (sender is Button btn && btn.CommandParameter is CalendarProject proj)
         {
-            var confirm = await this.DisplayAlertAsync("Delete Project", $"Delete '{proj.Name}'? This removes all its files.", "Delete", "Cancel");
+            bool confirm = await this.DisplayAlertAsync("Delete Project", $"Delete '{proj.Name}'? This removes all its files.", "Delete", "Cancel");
             if (confirm)
             {
                 await _vm.DeleteProjectAsync(proj);
@@ -108,7 +111,7 @@ public partial class ProjectsPage : ContentPage
             btn.IsEnabled = false;
             try
             {
-                var route = $"designer?projectId={Uri.EscapeDataString(proj.Id)}";
+                string route = $"designer?projectId={Uri.EscapeDataString(proj.Id)}";
                 await Shell.Current.GoToAsync(route);
             }
             finally
