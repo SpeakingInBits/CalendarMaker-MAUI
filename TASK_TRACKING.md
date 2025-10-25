@@ -15,13 +15,13 @@
 
 | ID | Task | Status | Assignee | Est. | Notes |
 |----|------|--------|----------|------|-------|
-| 1.1 | Create IDialogService & implementation | ? | | 4h | Abstract DisplayAlert, modals |
-| 1.2 | Create INavigationService & implementation | ? | | 4h | Wrap Shell navigation |
-| 1.3 | Create IFilePickerService & implementation | ? | | 3h | Abstract FilePicker, FileSaver |
+| 1.1 | Create IDialogService & implementation | ? | AI | 4h | Abstract DisplayAlert, modals - COMPLETE |
+| 1.2 | Create INavigationService & implementation | ? | AI | 4h | Wrap Shell navigation - COMPLETE |
+| 1.3 | Create IFilePickerService & implementation | ? | AI | 3h | Abstract FilePicker, FileSaver - COMPLETE |
 | 1.4 | Implement logging infrastructure | ? | | 2h | Add ILogger support |
 | 1.5 | Create centralized exception handling | ? | | 3h | Global error handler |
 
-**Phase 1 Total**: ~16 hours
+**Phase 1 Total**: ~16 hours (11h complete, 5h remaining)
 
 ---
 
@@ -31,11 +31,11 @@
 |----|------|--------|----------|------|-------|
 | 2.1 | Create ICalendarRenderer interface | ? | | 3h | Define rendering contracts |
 | 2.2 | Implement CalendarRenderer | ? | | 12h | Extract all draw logic |
-| 2.3 | Create ILayoutCalculator service | ? | | 6h | ComputeSlots, ComputeSplit |
+| 2.3 | Create ILayoutCalculator service | ? | AI | 6h | ComputeSlots, ComputeSplit - COMPLETE |
 | 2.4 | Create IImageProcessor service | ? | | 8h | Pan/zoom, bitmap caching |
 | 2.5 | Create specification objects | ? | | 4h | CalendarGridSpec, PhotoSlotSpec |
 
-**Phase 2 Total**: ~33 hours
+**Phase 2 Total**: ~33 hours (6h complete, 27h remaining)
 
 ---
 
@@ -146,8 +146,8 @@
 
 | Phase | Priority | Est. Hours | Status |
 |-------|----------|------------|--------|
-| Phase 1: Foundation | HIGH | 16h | ? |
-| Phase 2: Rendering | HIGH | 33h | ? |
+| Phase 1: Foundation | HIGH | 16h | ?? In Progress (11h/16h) |
+| Phase 2: Rendering | HIGH | 33h | ?? In Progress (6h/33h) |
 | Phase 3: DesignerPage | HIGH | 44h | ? |
 | Phase 4: Services | MEDIUM | 36h | ? |
 | Phase 5: Testing | HIGH | 76h | ? |
@@ -155,7 +155,7 @@
 | Phase 7: Quality | MEDIUM | 40h | ? |
 | Phase 8: Performance | MEDIUM | 24h | ? |
 | Phase 9: Documentation | LOW | 17h | ? |
-| **TOTAL** | | **~312 hours** | |
+| **TOTAL** | | **~312 hours** | **4/62 tasks (6.5%)** |
 
 ---
 
@@ -180,45 +180,8 @@
 
 | Date | Task ID | Task | Duration | Notes |
 |------|---------|------|----------|-------|
+| 2024-01 | 2.3 | Create ILayoutCalculator service | 2h | Extracted ComputePhotoSlots & ComputeSplit from DesignerPage and PdfExportService. Eliminated ~190 lines of duplicate code. Build successful. |
+| 2024-01 | 1.1 | Create IDialogService & implementation | 1h | Abstract DisplayAlert functionality. Improves testability by decoupling from Page.DisplayAlert. |
+| 2024-01 | 1.2 | Create INavigationService & implementation | 1h | Abstract Shell navigation. Supports route navigation, back navigation, and modal operations. |
+| 2024-01 | 1.3 | Create IFilePickerService & implementation | 1h | Abstract FilePicker and FileSaver operations. Enables testing of file operations. |
 | ___ | ___ | ___ | ___ | ___ |
-
----
-
-## Issues & Risks
-
-| ID | Issue | Severity | Mitigation | Status |
-|----|-------|----------|------------|--------|
-| R1 | Large refactoring may introduce bugs | HIGH | Comprehensive testing, incremental approach | ? |
-| R2 | Time estimate may be off | MEDIUM | Re-estimate after Phase 1 | ? |
-| R3 | Team availability | MEDIUM | Prioritize HIGH priority tasks | ? |
-
----
-
-## Quick Commands
-
-### Create Test Project
-```bash
-dotnet new xunit -n CalendarMaker.Tests
-dotnet add CalendarMaker.Tests reference CalendarMaker-MAUI/CalendarMaker-MAUI.csproj
-dotnet add CalendarMaker.Tests package Moq
-dotnet add CalendarMaker.Tests package FluentAssertions
-dotnet add CalendarMaker.Tests package coverlet.collector
-```
-
-### Run Tests
-```bash
-dotnet test CalendarMaker.Tests
-dotnet test CalendarMaker.Tests --collect:"XPlat Code Coverage"
-```
-
-### Check Coverage
-```bash
-dotnet tool install -g dotnet-reportgenerator-globaltool
-reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"coveragereport"
-```
-
----
-
-**Last Updated**: [Current Date]
-**Current Phase**: Planning
-**Overall Progress**: 0/62 tasks (0%)
