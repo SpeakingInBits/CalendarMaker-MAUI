@@ -1,10 +1,11 @@
+using System.Globalization;
 using CalendarMaker_MAUI.Models;
 using CalendarMaker_MAUI.Services;
 using CommunityToolkit.Maui.Storage;
+using Microsoft.Maui.Storage;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
-using System.Globalization;
 
 namespace CalendarMaker_MAUI.Views;
 
@@ -16,6 +17,7 @@ public partial class DesignerPage : ContentPage
     private readonly IProjectStorageService _storage;
     private readonly IAssetService _assets;
     private readonly IPdfExportService _pdf;
+    private readonly ILayoutCalculator _layoutCalculator;
     private readonly SKCanvasView _canvas;
 
     private int _pageIndex; // -1=Front Cover, 0-11=Months, 12=Back Cover
@@ -40,13 +42,14 @@ public partial class DesignerPage : ContentPage
 
     public string? ProjectId { get; set; }
 
-    public DesignerPage(ICalendarEngine engine, IProjectStorageService storage, IAssetService assets, IPdfExportService pdf)
+    public DesignerPage(ICalendarEngine engine, IProjectStorageService storage, IAssetService assets, IPdfExportService pdf, ILayoutCalculator layoutCalculator)
     {
         InitializeComponent();
         _engine = engine;
         _storage = storage;
         _assets = assets;
         _pdf = pdf;
+        _layoutCalculator = layoutCalculator;
 
         // Ensure CanvasHost exists before assigning
         _canvas = new SKCanvasView { IgnorePixelScaling = false };
@@ -54,7 +57,10 @@ public partial class DesignerPage : ContentPage
         _canvas.EnableTouchEvents = true;
         _canvas.Touch += OnCanvasTouch;
 
-        CanvasHost?.Content = _canvas;
+        if (CanvasHost != null)
+        {
+            CanvasHost.Content = _canvas;
+        }
 
         BackBtn.Clicked += async (_, __) => await Shell.Current.GoToAsync("..");
         PrevBtn.Clicked += (_, __) => NavigatePage(-1);
@@ -104,10 +110,7 @@ public partial class DesignerPage : ContentPage
 
     private async Task ImportPhotosToProjectAsync()
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         var results = await FilePicker.PickMultipleAsync(new PickOptions
         {
@@ -115,10 +118,7 @@ public partial class DesignerPage : ContentPage
             FileTypes = FilePickerFileType.Images
         });
 
-        if (results == null || !results.Any())
-        {
-            return;
-        }
+        if (results == null || !results.Any()) return;
 
         foreach (var result in results)
         {
@@ -131,10 +131,7 @@ public partial class DesignerPage : ContentPage
 
     private async Task ShowPhotoSelectorAsync()
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         // Get all photos to show both unassigned and assigned
         var allPhotos = await _assets.GetAllPhotosAsync(_project);
@@ -143,7 +140,7 @@ public partial class DesignerPage : ContentPage
         if (_pageIndex == -2)
         {
             // Previous year's December
-            int prevYear = _project.Year - 1;
+            var prevYear = _project.Year - 1;
             slotDescription = $"December {prevYear} (Prev Year) - Slot {_activeSlotIndex + 1}";
         }
         else if (_pageIndex == -1)
@@ -156,9 +153,9 @@ public partial class DesignerPage : ContentPage
         }
         else
         {
-            int month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
-            int year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
-            string monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+            var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+            var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
+            var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
             slotDescription = $"{monthName} - Slot {_activeSlotIndex + 1}";
         }
 
@@ -167,11 +164,7 @@ public partial class DesignerPage : ContentPage
         // Assign selected photo to the active target
         modal.PhotoSelected += async (_, args) =>
         {
-            if (_project == null)
-            {
-                return;
-            }
-
+            if (_project == null) return;
             var selected = args.SelectedAsset;
 
             string role;
@@ -201,10 +194,7 @@ public partial class DesignerPage : ContentPage
         // Remove any existing photo from the active target
         modal.RemoveRequested += async (_, __) =>
            {
-               if (_project == null)
-               {
-                   return;
-               }
+               if (_project == null) return;
 
                if (_pageIndex == -1) // Front cover
                {
@@ -256,24 +246,14 @@ public partial class DesignerPage : ContentPage
         FirstDowPicker.ItemsSource = Enum.GetNames(typeof(DayOfWeek));
         PhotoLayoutPicker.SelectedIndexChanged += (_, __) => ApplyPhotoLayoutSelection();
         if (PhotoLayoutPicker.SelectedIndex < 0)
-        {
             PhotoLayoutPicker.SelectedIndex = 0; // default Single
-        }
     }
 
     private void ApplyPhotoLayoutSelection()
     {
-        if (_project == null)
-        {
-            return;
-        }
-
-        int selected = PhotoLayoutPicker.SelectedIndex;
-        if (selected < 0)
-        {
-            selected = 0;
-        }
-
+        if (_project == null) return;
+        var selected = PhotoLayoutPicker.SelectedIndex;
+        if (selected < 0) selected = 0;
         var layout = selected switch
         {
             1 => PhotoLayout.TwoVerticalSplit,
@@ -311,7 +291,7 @@ public partial class DesignerPage : ContentPage
         if (_pageIndex == -2)
         {
             // Previous year's December (only in double-sided mode)
-            int prevYear = _project.Year - 1;
+            var prevYear = _project.Year - 1;
             MonthLabel.Text = $"December {prevYear} (Prev Year)";
             SyncPhotoLayoutPicker();
         }
@@ -327,8 +307,8 @@ public partial class DesignerPage : ContentPage
         }
         else
         {
-            int month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
-            int year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
+            var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+            var year = _project.Year + (_project.StartMonth - 1 + _pageIndex) / 12;
             MonthLabel.Text = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
             SyncPhotoLayoutPicker();
         }
@@ -359,10 +339,7 @@ public partial class DesignerPage : ContentPage
 
     private void OnBorderlessChanged(object? sender, CheckedChangedEventArgs e)
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         if (_pageIndex == -1)
         {
@@ -379,21 +356,18 @@ public partial class DesignerPage : ContentPage
 
     private void OnDoubleSidedChanged(object? sender, CheckedChangedEventArgs e)
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         // If enabling double-sided mode and start month is not January, warn and change it
         if (e.Value && _project.StartMonth != 1)
         {
             MainThread.BeginInvokeOnMainThread(async () =>
          {
-             bool proceed = await this.DisplayAlertAsync(
-               "Change Start Month?",
-               "Double-sided calendars require a January start month. Would you like to change the start month to January?",
-               "Yes, Change to January",
-               "Cancel");
+             bool proceed = await this.DisplayAlert(
+"Change Start Month?",
+  "Double-sided calendars require a January start month. Would you like to change the start month to January?",
+"Yes, Change to January",
+ "Cancel");
 
              if (proceed)
              {
@@ -435,10 +409,7 @@ public partial class DesignerPage : ContentPage
 
     private void SyncPhotoLayoutPicker()
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         PhotoLayout layout;
 
@@ -461,7 +432,7 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
-        int idx = layout switch
+        var idx = layout switch
         {
             PhotoLayout.TwoVerticalSplit => 1,
             PhotoLayout.Grid2x2 => 2,
@@ -476,15 +447,9 @@ public partial class DesignerPage : ContentPage
 #if WINDOWS
     private void OnCanvasKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
-        if (_project == null) 
-        {
-            return;
-        }
+        if (_project == null) return;
         var asset = GetActiveAsset();
-        if (asset == null) 
-        {
-            return;
-        }
+        if (asset == null) return;
         double step = 0.05; // pan step
         bool handled = false;
         switch (e.Key)
@@ -506,11 +471,7 @@ public partial class DesignerPage : ContentPage
 
     private void FlipLayout()
     {
-        if (_project == null)
-        {
-            return;
-        }
-
+        if (_project == null) return;
         var p = _project.LayoutSpec.Placement;
         _project.LayoutSpec.Placement = p switch
         {
@@ -526,12 +487,8 @@ public partial class DesignerPage : ContentPage
 
     private void OnYearChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_project == null)
-        {
-            return;
-        }
-
-        if (int.TryParse(e.NewTextValue, out int year) && year >= 1900 && year <= 2100)
+        if (_project == null) return;
+        if (int.TryParse(e.NewTextValue, out var year) && year >= 1900 && year <= 2100)
         {
             _project.Year = year;
             UpdatePageLabel();
@@ -548,8 +505,8 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
-        string originalText = btn.Text;
-        bool originalEnabled = btn.IsEnabled;
+        var originalText = btn.Text;
+        var originalEnabled = btn.IsEnabled;
         try
         {
             btn.IsEnabled = false;
@@ -568,10 +525,7 @@ public partial class DesignerPage : ContentPage
     {
         await WithBusyButtonAsync(sender as Button, async () =>
         {
-            if (_project == null)
-            {
-                return;
-            }
+            if (_project == null) return;
 
             byte[] bytes;
             string fileName;
@@ -589,7 +543,7 @@ public partial class DesignerPage : ContentPage
             else
             {
                 bytes = await _pdf.ExportMonthAsync(_project, _pageIndex);
-                int month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
+                var month = ((_project.StartMonth - 1 + _pageIndex) % 12) + 1;
                 fileName = $"Calendar_{_project.Year}_{month:00}.pdf";
             }
 
@@ -601,23 +555,16 @@ public partial class DesignerPage : ContentPage
     {
         await WithBusyButtonAsync(sender as Button, async () =>
         {
-            if (_project == null)
-            {
-                return;
-            }
-
-            byte[] bytes = await _pdf.ExportCoverAsync(_project);
-            string fileName = $"Calendar_{_project.Year}_Cover.pdf";
+            if (_project == null) return;
+            var bytes = await _pdf.ExportCoverAsync(_project);
+            var fileName = $"Calendar_{_project.Year}_Cover.pdf";
             await SaveBytesAsync(fileName, bytes);
         });
     }
 
     private async void OnExportYearClicked(object? sender, EventArgs e)
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         var cts = new CancellationTokenSource();
         var progressModal = new ExportProgressModal();
@@ -637,49 +584,46 @@ public partial class DesignerPage : ContentPage
         await Shell.Current.Navigation.PushModalAsync(progressModal, true);
 
         _ = Task.Run(async () =>
-        {
-            try
-            {
-                exportedBytes = await _pdf.ExportYearAsync(_project, includeCover: true, progress, cts.Token);
-                exportCompleted = true;
-            }
-            catch (OperationCanceledException)
-            {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                 {
-                     try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-                     await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
-                 });
-                return;
-            }
-            catch (Exception ex)
-            {
-                exportException = ex;
-            }
+              {
+                  try
+                  {
+                      exportedBytes = await _pdf.ExportYearAsync(_project, includeCover: true, progress, cts.Token);
+                      exportCompleted = true;
+                  }
+                  catch (OperationCanceledException)
+                  {
+                      await MainThread.InvokeOnMainThreadAsync(async () =>
+                       {
+                      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+                      await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+                  });
+                      return;
+                  }
+                  catch (Exception ex)
+                  {
+                      exportException = ex;
+                  }
 
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-           {
-               try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+                  await MainThread.InvokeOnMainThreadAsync(async () =>
+         {
+                try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
 
-               if (exportException != null)
-               {
-                   await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
-               }
-               else if (exportCompleted && exportedBytes != null)
-               {
-                   string fileName = $"Calendar_{_project.Year}_FullYear.pdf";
-                   await SaveBytesAsync(fileName, exportedBytes);
-               }
-           });
-        });
+                if (exportException != null)
+                {
+                    await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+                }
+                else if (exportCompleted && exportedBytes != null)
+                {
+                    var fileName = $"Calendar_{_project.Year}_FullYear.pdf";
+                    await SaveBytesAsync(fileName, exportedBytes);
+                }
+            });
+              });
     }
 
     private async void OnExportDoubleSidedClicked(object? sender, EventArgs e)
     {
-        if (_project == null)
-        {
-            return;
-        }
+        if (_project == null) return;
 
         var cts = new CancellationTokenSource();
         var progressModal = new ExportProgressModal();
@@ -692,52 +636,48 @@ public partial class DesignerPage : ContentPage
         Exception? exportException = null;
 
         progressModal.Cancelled += async (_, __) =>
-        {
-            try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-        };
+  {
+      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+  };
 
         await Shell.Current.Navigation.PushModalAsync(progressModal, true);
 
         _ = Task.Run(async () =>
-        {
-            try
-            {
-                exportedBytes = await _pdf.ExportDoubleSidedAsync(_project, progress, cts.Token);
-                exportCompleted = true;
-            }
-            catch (OperationCanceledException)
-            {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
-                    await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
-                });
-                return;
-            }
-            catch (Exception ex)
-            {
-                exportException = ex;
-            }
+   {
+       try
+       {
+           exportedBytes = await _pdf.ExportDoubleSidedAsync(_project, progress, cts.Token);
+           exportCompleted = true;
+       }
+       catch (OperationCanceledException)
+       {
+           await MainThread.InvokeOnMainThreadAsync(async () =>
+       {
+           try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
+           await this.DisplayAlertAsync("Export Cancelled", "The export was cancelled.", "OK");
+       });
+           return;
+       }
+       catch (Exception ex)
+       {
+           exportException = ex;
+       }
 
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-             {
-                 try
-                 {
-                     await Shell.Current.Navigation.PopModalAsync();
-                 }
-                 catch { }
+       await MainThread.InvokeOnMainThreadAsync(async () =>
+  {
+      try { await Shell.Current.Navigation.PopModalAsync(); } catch { }
 
-                 if (exportException != null)
-                 {
-                     await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
-                 }
-                 else if (exportCompleted && exportedBytes != null)
-                 {
-                     string fileName = $"Calendar_{_project.Year}_DoubleSided.pdf";
-                     await SaveBytesAsync(fileName, exportedBytes);
-                 }
-             });
-        });
+      if (exportException != null)
+      {
+          await this.DisplayAlertAsync("Export Failed", exportException.Message, "OK");
+      }
+      else if (exportCompleted && exportedBytes != null)
+      {
+          var fileName = $"Calendar_{_project.Year}_DoubleSided.pdf";
+          await SaveBytesAsync(fileName, exportedBytes);
+      }
+  });
+   });
     }
 
     private async Task SaveBytesAsync(string suggestedFileName, byte[] bytes)
@@ -752,11 +692,8 @@ public partial class DesignerPage : ContentPage
 
     private async Task EnsureProjectLoadedAsync()
     {
-        if (_project != null || string.IsNullOrEmpty(ProjectId))
-        {
-            return;
-        }
-
+        if (_project != null) return;
+        if (string.IsNullOrEmpty(ProjectId)) return;
         var projects = await _storage.GetProjectsAsync();
         _project = projects.FirstOrDefault(p => p.Id == ProjectId);
         if (_project != null)
@@ -800,35 +737,22 @@ public partial class DesignerPage : ContentPage
 
     private ImageAsset? GetActiveAsset()
     {
-        if (_project == null)
-        {
-            return null;
-        }
+        if (_project == null) return null;
 
         if (_pageIndex == -1)
-        {
             return _project.ImageAssets.FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
-        }
         else if (_pageIndex == 12)
-        {
             return _project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == _activeSlotIndex);
-        }
         else
-        {
             return _project.ImageAssets
                 .Where(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == _activeSlotIndex)
                 .OrderBy(a => a.Order)
                 .FirstOrDefault();
-        }
     }
 
     private void UpdateAssetZoom(double newValue)
     {
-        if (_project == null)
-        {
-            return;
-        }
-
+        if (_project == null) return;
         var asset = GetActiveAsset();
         if (asset != null)
         {
@@ -843,15 +767,13 @@ public partial class DesignerPage : ContentPage
         var canvas = e.Surface.Canvas;
         canvas.Clear(SKColors.White);
         if (_project is null)
-        {
             return;
-        }
 
         var (pageWpt, pageHpt) = PageSizes.GetPoints(_project.PageSpec);
         if (pageWpt <= 0 || pageHpt <= 0) { pageWpt = 612; pageHpt = 792; }
-        float scale = Math.Min(e.Info.Width / (float)pageWpt, e.Info.Height / (float)pageHpt);
-        float offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
-        float offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
+        var scale = Math.Min(e.Info.Width / (float)pageWpt, e.Info.Height / (float)pageHpt);
+        var offsetX = (e.Info.Width - (float)pageWpt * scale) / 2f;
+        var offsetY = (e.Info.Height - (float)pageHpt * scale) / 2f;
 
         _pageScale = scale; _pageOffsetX = offsetX; _pageOffsetY = offsetY;
 
@@ -915,25 +837,26 @@ public partial class DesignerPage : ContentPage
         if (_pageIndex == -1) // Front cover
         {
             var layout = _project.FrontCoverPhotoLayout;
-            _lastPhotoSlots = ComputePhotoSlots(contentRect, layout, true);
+            _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
+
             _lastPhotoRect = contentRect;
             System.Diagnostics.Debug.WriteLine($"Front Cover: Layout={layout}, Slots={_lastPhotoSlots.Count}, ActiveSlot={_activeSlotIndex}");
             DrawCover(canvas, contentRect, _project, true);
         }
         else if (_pageIndex == -2) // Previous December (only in double-sided mode)
         {
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, _project.LayoutSpec);
 
             // Month index 6 represents December when StartMonth is January (0-based from StartMonth)
             // For previous year's December, we use index 6 but with previous year
             int decemberIndex = (_project.StartMonth == 1) ? 11 : (12 - _project.StartMonth);
 
             var layout = _project.MonthPhotoLayouts.TryGetValue(decemberIndex, out var perMonth)
-                     ? perMonth
-           : _project.LayoutSpec.PhotoLayout;
+              ? perMonth
+                : _project.LayoutSpec.PhotoLayout;
 
             _lastPhotoRect = photoRect;
-            _lastPhotoSlots = ComputePhotoSlots(photoRect, layout, false);
+            _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             DrawPhotos(canvas, _lastPhotoSlots);
 
             // Draw calendar for previous year's December
@@ -942,16 +865,16 @@ public partial class DesignerPage : ContentPage
         else if (_pageIndex == 12) // Back cover
         {
             var layout = _project.BackCoverPhotoLayout;
-            _lastPhotoSlots = ComputePhotoSlots(contentRect, layout, true);
+            _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             _lastPhotoRect = contentRect;
             System.Diagnostics.Debug.WriteLine($"Back Cover: Layout={layout}, Slots={_lastPhotoSlots.Count}, ActiveSlot={_activeSlotIndex}");
             DrawCover(canvas, contentRect, _project, false);
         }
         else // Month page
         {
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, _project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, _project.LayoutSpec);
             _lastPhotoRect = photoRect;
-            _lastPhotoSlots = ComputePhotoSlots(photoRect, _project.LayoutSpec.PhotoLayout, false);
+            _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, _project.LayoutSpec.PhotoLayout);
             DrawPhotos(canvas, _lastPhotoSlots);
             DrawCalendarGrid(canvas, calRect, _project);
         }
@@ -962,10 +885,7 @@ public partial class DesignerPage : ContentPage
     private List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout, bool isCover = false)
     {
         if (!isCover && _project != null && _pageIndex >= 0 && _pageIndex <= 11 && _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var perMonth))
-        {
             layout = perMonth;
-        }
-
         const float gap = 4f;
         var list = new List<SKRect>();
         switch (layout)
@@ -1021,11 +941,7 @@ public partial class DesignerPage : ContentPage
 
     private void DrawPhotos(SKCanvas canvas, List<SKRect> slots)
     {
-        if (_project == null)
-        {
-            return;
-        }
-
+        if (_project == null) return;
         for (int i = 0; i < slots.Count; i++)
         {
             var rect = slots[i];
@@ -1043,8 +959,8 @@ public partial class DesignerPage : ContentPage
                 if (i == _activeSlotIndex)
                 {
                     using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 12, IsAntialias = true };
-                    string hintText = "Double-click to assign photo";
-                    float textWidth = hintPaint.MeasureText(hintText);
+                    var hintText = "Double-click to assign photo";
+                    var textWidth = hintPaint.MeasureText(hintText);
                     canvas.DrawText(hintText, rect.MidX - textWidth / 2, rect.MidY, hintPaint);
                 }
             }
@@ -1071,7 +987,7 @@ public partial class DesignerPage : ContentPage
 
     private void DrawCover(SKCanvas canvas, SKRect bounds, CalendarProject project, bool isFrontCover)
     {
-        string role = isFrontCover ? "coverPhoto" : "backCoverPhoto";
+        var role = isFrontCover ? "coverPhoto" : "backCoverPhoto";
 
         for (int i = 0; i < _lastPhotoSlots.Count; i++)
         {
@@ -1100,8 +1016,8 @@ public partial class DesignerPage : ContentPage
                 if (i == _activeSlotIndex)
                 {
                     using var hintPaint = new SKPaint { Color = SKColors.Gray, TextSize = 12, IsAntialias = true };
-                    string hintText = "Double-click to assign photo";
-                    float textWidth = hintPaint.MeasureText(hintText);
+                    var hintText = "Double-click to assign photo";
+                    var textWidth = hintPaint.MeasureText(hintText);
                     canvas.DrawText(hintText, rect.MidX - textWidth / 2, rect.MidY, hintPaint);
                 }
             }
@@ -1116,26 +1032,26 @@ public partial class DesignerPage : ContentPage
 
     private void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
     {
-        float imgW = (float)bmp.Width;
-        float imgH = (float)bmp.Height;
-        float rectW = rect.Width;
-        float rectH = rect.Height;
-        float imgAspect = imgW / imgH;
-        float rectAspect = rectW / rectH;
+        var imgW = (float)bmp.Width;
+        var imgH = (float)bmp.Height;
+        var rectW = rect.Width;
+        var rectH = rect.Height;
+        var imgAspect = imgW / imgH;
+        var rectAspect = rectW / rectH;
 
         float scale = (imgAspect > rectAspect ? rectH / imgH : rectW / imgW) * (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
 
-        float targetW = imgW * scale;
-        float targetH = imgH * scale;
-        float excessX = Math.Max(0, (targetW - rectW) / 2f);
-        float excessY = Math.Max(0, (targetH - rectH) / 2f);
+        var targetW = imgW * scale;
+        var targetH = imgH * scale;
+        var excessX = Math.Max(0, (targetW - rectW) / 2f);
+        var excessY = Math.Max(0, (targetH - rectH) / 2f);
 
-        float px = (float)Math.Clamp(asset.PanX, -1, 1);
-        float py = (float)Math.Clamp(asset.PanY, -1, 1);
+        var px = (float)Math.Clamp(asset.PanX, -1, 1);
+        var py = (float)Math.Clamp(asset.PanY, -1, 1);
 
-        float left = rect.Left - excessX + px * excessX;
-        float top = rect.Top - excessY + py * excessY;
-        SKRect dest = new(left, top, left + targetW, top + targetH);
+        var left = rect.Left - excessX + px * excessX;
+        var top = rect.Top - excessY + py * excessY;
+        var dest = new SKRect(left, top, left + targetW, top + targetH);
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.Save();
@@ -1147,9 +1063,7 @@ public partial class DesignerPage : ContentPage
     private void OnCanvasTouch(object? sender, SKTouchEventArgs e)
     {
         if (_project == null)
-        {
             return;
-        }
 
         var loc = e.Location;
         float density = 1f;
@@ -1157,20 +1071,19 @@ public partial class DesignerPage : ContentPage
         {
             var canvasSize = _canvas.CanvasSize;
             if (_canvas.Width > 0)
-            {
                 density = (float)(canvasSize.Width / (float)_canvas.Width);
-            }
         }
         catch { }
         var touchPx = new SKPoint((float)loc.X * density, (float)loc.Y * density);
 
         var pagePt = new SKPoint((float)((touchPx.X - _pageOffsetX) / _pageScale), (float)((touchPx.Y - _pageOffsetY) / _pageScale));
-        bool isCover = (_pageIndex == -1 || _pageIndex == 12);
+        var isCover = (_pageIndex == -1 || _pageIndex == 12);
         var hitRect = isCover ? _lastContentRect : _lastPhotoRect;
 
         int HitTestSlot(SKPoint pt)
         {
-            return _lastPhotoSlots.Count == 0 ? -1 : _lastPhotoSlots.FindIndex(r => r.Contains(pt));
+            if (_lastPhotoSlots.Count == 0) return -1;
+            return _lastPhotoSlots.FindIndex(r => r.Contains(pt));
         }
 
         SKRect CurrentTargetRect()
@@ -1183,7 +1096,7 @@ public partial class DesignerPage : ContentPage
             case SKTouchAction.Pressed:
                 _isPointerDown = true;
 
-                int hitIdx = HitTestSlot(pagePt);
+                var hitIdx = HitTestSlot(pagePt);
                 System.Diagnostics.Debug.WriteLine($"Touch Pressed: HitIdx={hitIdx}, ActiveSlot={_activeSlotIndex}, PageIndex={_pageIndex}, IsCover={isCover}");
                 if (hitIdx >= 0 && hitIdx != _activeSlotIndex)
                 {
@@ -1204,16 +1117,12 @@ public partial class DesignerPage : ContentPage
                     using var bmp = SKBitmap.Decode(assetPressed!.Path);
                     if (bmp != null)
                     {
-                        float imgW = (float)bmp.Width;
-                        float imgH = (float)bmp.Height;
-                        float rectW = targetRectPressed.Width;
-                        float rectH = targetRectPressed.Height;
-                        float imgAspect = imgW / imgH;
-                        float rectAspect = rectW / rectH;
+                        var imgW = (float)bmp.Width; var imgH = (float)bmp.Height;
+                        var rectW = targetRectPressed.Width; var rectH = targetRectPressed.Height;
+                        var imgAspect = imgW / imgH; var rectAspect = rectW / rectH;
                         float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
                         float scale = baseScale * (float)Math.Clamp(assetPressed.Zoom <= 0 ? 1 : assetPressed.Zoom, 0.5, 3.0);
-                        float targetW = imgW * scale;
-                        float targetH = imgH * scale;
+                        var targetW = imgW * scale; var targetH = imgH * scale;
                         _dragExcessX = Math.Max(0, (targetW - rectW) / 2f);
                         _dragExcessY = Math.Max(0, (targetH - rectH) / 2f);
 
@@ -1231,8 +1140,8 @@ public partial class DesignerPage : ContentPage
                     var assetMove = isCover
                         ? _project.ImageAssets.FirstOrDefault(a => a.Role == (_pageIndex == -1 ? "coverPhoto" : "backCoverPhoto") && (a.SlotIndex ?? 0) == _activeSlotIndex)
                         : _project.ImageAssets.FirstOrDefault(a => a.Role == "monthPhoto" && a.MonthIndex == _pageIndex && (a.SlotIndex ?? 0) == _activeSlotIndex);
-                    float dx0 = pagePt.X - _dragStartPagePt.X;
-                    float dy0 = pagePt.Y - _dragStartPagePt.Y;
+                    var dx0 = pagePt.X - _dragStartPagePt.X;
+                    var dy0 = pagePt.Y - _dragStartPagePt.Y;
                     if (!_isDragging)
                     {
                         if (Math.Abs(dx0) > DragStartThreshold || Math.Abs(dy0) > DragStartThreshold)
@@ -1288,7 +1197,7 @@ public partial class DesignerPage : ContentPage
 
     private (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
     {
-        float ratio = (float)Math.Clamp(spec.SplitRatio, 0.1, 0.9);
+        var ratio = (float)Math.Clamp(spec.SplitRatio, 0.1, 0.9);
         return spec.Placement switch
         {
             LayoutPlacement.PhotoLeftCalendarRight => (new SKRect(area.Left, area.Top, area.Left + area.Width * ratio, area.Bottom), new SKRect(area.Left + area.Width * ratio, area.Top, area.Right, area.Bottom)),
@@ -1304,8 +1213,8 @@ public partial class DesignerPage : ContentPage
         float Stroke1px() => 1f / Math.Max(_pageScale, 0.0001f);
         float Snap(float v) => (float)Math.Round(v * _pageScale) / Math.Max(_pageScale, 0.0001f);
 
-        int month = ((project.StartMonth - 1 + _pageIndex) % 12) + 1;
-        int year = project.Year + (project.StartMonth - 1 + _pageIndex) / 12;
+        var month = ((project.StartMonth - 1 + _pageIndex) % 12) + 1;
+        var year = project.Year + (project.StartMonth - 1 + _pageIndex) / 12;
         var weeks = _engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
         float headerH = 40;
@@ -1313,15 +1222,15 @@ public partial class DesignerPage : ContentPage
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
-        string title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        float titleWidth = titlePaint.MeasureText(title);
+        var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
         float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
         string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         int shift = (int)project.FirstDayOfWeek;
-        string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
+        var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
         using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = Stroke1px(), IsAntialias = false };
         using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
@@ -1330,30 +1239,26 @@ public partial class DesignerPage : ContentPage
         for (int c = 0; c < 7; c++)
         {
             var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
-            string t = displayDows[c];
-            float tw = textPaint.MeasureText(t);
+            var t = displayDows[c];
+            var tw = textPaint.MeasureText(t);
             canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            float x0 = Snap(cell.Left);
-            float x1 = Snap(cell.Right);
-            float y0 = Snap(cell.Top);
-            float y1 = Snap(cell.Bottom);
+            var x0 = Snap(cell.Left);
+            var x1 = Snap(cell.Right);
+            var y0 = Snap(cell.Top);
+            var y1 = Snap(cell.Bottom);
             canvas.DrawLine(x0, y0, x1, y0, gridPen);
             canvas.DrawLine(x0, y1, x1, y1, gridPen);
             canvas.DrawLine(x0, y0, x0, y1, gridPen);
             if (c == 6)
-            {
                 canvas.DrawLine(x1, y0, x1, y1, gridPen);
-            }
         }
 
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         if (rows <= 0)
         {
-            float xa = Snap(weeksArea.Left);
-            float xb = Snap(weeksArea.Right);
-            float ya = Snap(weeksArea.Top);
-            float yb = Snap(weeksArea.Bottom);
+            var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
+            var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
             canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
             return;
         }
@@ -1364,34 +1269,34 @@ public partial class DesignerPage : ContentPage
         {
             for (int c = 0; c < 7; c++)
             {
-                float left = weeksArea.Left + c * colW;
-                float top = weeksArea.Top + r * rowH;
-                float right = weeksArea.Left + (c + 1) * colW;
-                float bottom = weeksArea.Top + (r + 1) * rowH;
-                SKRect cell = new(left, top, right, bottom);
+                var left = weeksArea.Left + c * colW;
+                var top = weeksArea.Top + r * rowH;
+                var right = weeksArea.Left + (c + 1) * colW;
+                var bottom = weeksArea.Top + (r + 1) * rowH;
+                var cell = new SKRect(left, top, right, bottom);
 
                 var date = weeks[r][c];
                 if (date.HasValue && date.Value.Month == month)
                 {
-                    string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+                    var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
                     canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
                 }
             }
         }
 
-        float wx0 = Snap(weeksArea.Left);
-        float wx1 = Snap(weeksArea.Right);
-        float wy0 = Snap(weeksArea.Top);
-        float wy1 = Snap(weeksArea.Bottom);
+        var wx0 = Snap(weeksArea.Left);
+        var wx1 = Snap(weeksArea.Right);
+        var wy0 = Snap(weeksArea.Top);
+        var wy1 = Snap(weeksArea.Bottom);
 
         for (int c = 0; c <= 7; c++)
         {
-            float x = Snap(weeksArea.Left + c * colW);
+            var x = Snap(weeksArea.Left + c * colW);
             canvas.DrawLine(x, wy0, x, wy1, gridPen);
         }
         for (int r = 0; r <= rows; r++)
         {
-            float y = Snap(weeksArea.Top + r * rowH);
+            var y = Snap(weeksArea.Top + r * rowH);
             canvas.DrawLine(wx0, y, wx1, y, gridPen);
         }
 
@@ -1413,15 +1318,15 @@ public partial class DesignerPage : ContentPage
         var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
 
         using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
-        string title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        float titleWidth = titlePaint.MeasureText(title);
+        var title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
         float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
         string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         int shift = (int)project.FirstDayOfWeek;
-        string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
+        var displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
         using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = Stroke1px(), IsAntialias = false };
         using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
@@ -1430,30 +1335,26 @@ public partial class DesignerPage : ContentPage
         for (int c = 0; c < 7; c++)
         {
             var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
-            string t = displayDows[c];
-            float tw = textPaint.MeasureText(t);
+            var t = displayDows[c];
+            var tw = textPaint.MeasureText(t);
             canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            float x0 = Snap(cell.Left);
-            float x1 = Snap(cell.Right);
-            float y0 = Snap(cell.Top);
-            float y1 = Snap(cell.Bottom);
+            var x0 = Snap(cell.Left);
+            var x1 = Snap(cell.Right);
+            var y0 = Snap(cell.Top);
+            var y1 = Snap(cell.Bottom);
             canvas.DrawLine(x0, y0, x1, y0, gridPen);
             canvas.DrawLine(x0, y1, x1, y1, gridPen);
             canvas.DrawLine(x0, y0, x0, y1, gridPen);
             if (c == 6)
-            {
                 canvas.DrawLine(x1, y0, x1, y1, gridPen);
-            }
         }
 
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
         int rows = weeks.Count;
         if (rows <= 0)
         {
-            float xa = Snap(weeksArea.Left);
-            float xb = Snap(weeksArea.Right);
-            float ya = Snap(weeksArea.Top);
-            float yb = Snap(weeksArea.Bottom);
+            var xa = Snap(weeksArea.Left); var xb = Snap(weeksArea.Right);
+            var ya = Snap(weeksArea.Top); var yb = Snap(weeksArea.Bottom);
             canvas.DrawRect(new SKRect(xa, ya, xb, yb), gridPen);
             return;
         }
@@ -1464,34 +1365,34 @@ public partial class DesignerPage : ContentPage
         {
             for (int c = 0; c < 7; c++)
             {
-                float left = weeksArea.Left + c * colW;
-                float top = weeksArea.Top + r * rowH;
-                float right = weeksArea.Left + (c + 1) * colW;
-                float bottom = weeksArea.Top + (r + 1) * rowH;
+                var left = weeksArea.Left + c * colW;
+                var top = weeksArea.Top + r * rowH;
+                var right = weeksArea.Left + (c + 1) * colW;
+                var bottom = weeksArea.Top + (r + 1) * rowH;
                 var cell = new SKRect(left, top, right, bottom);
 
                 var date = weeks[r][c];
                 if (date.HasValue && date.Value.Month == month)
                 {
-                    string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+                    var dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
                     canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
                 }
             }
         }
 
-        float wx0 = Snap(weeksArea.Left);
-        float wx1 = Snap(weeksArea.Right);
-        float wy0 = Snap(weeksArea.Top);
-        float wy1 = Snap(weeksArea.Bottom);
+        var wx0 = Snap(weeksArea.Left);
+        var wx1 = Snap(weeksArea.Right);
+        var wy0 = Snap(weeksArea.Top);
+        var wy1 = Snap(weeksArea.Bottom);
 
         for (int c = 0; c <= 7; c++)
         {
-            float x = Snap(weeksArea.Left + c * colW);
+            var x = Snap(weeksArea.Left + c * colW);
             canvas.DrawLine(x, wy0, x, wy1, gridPen);
         }
         for (int r = 0; r <= rows; r++)
         {
-            float y = Snap(weeksArea.Top + r * rowH);
+            var y = Snap(weeksArea.Top + r * rowH);
             canvas.DrawLine(wx0, y, wx1, y, gridPen);
         }
 

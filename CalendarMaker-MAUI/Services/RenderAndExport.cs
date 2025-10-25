@@ -27,6 +27,12 @@ public interface IPdfExportService
 public sealed class PdfExportService : IPdfExportService
 {
     private const float TargetDpi = 300f; // 300 DPI print quality
+    private readonly ILayoutCalculator _layoutCalculator;
+
+    public PdfExportService(ILayoutCalculator layoutCalculator)
+    {
+        _layoutCalculator = layoutCalculator;
+    }
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
         => RenderDocumentAsync(project, new[] { (monthIndex, false, false) }, null, default);
@@ -253,7 +259,7 @@ public sealed class PdfExportService : IPdfExportService
             sk.Translate(-topHalf.MidX, -topHalf.MidY);
 
             var backLayout = project.BackCoverPhotoLayout;
-            var backSlots = ComputePhotoSlots(topHalf, backLayout);
+            var backSlots = _layoutCalculator.ComputePhotoSlots(topHalf, backLayout);
             foreach (var (rect, slotIndex) in backSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -273,7 +279,7 @@ public sealed class PdfExportService : IPdfExportService
 
             // Draw front cover in bottom half (normal orientation within the already-rotated page)
             var frontLayout = project.FrontCoverPhotoLayout;
-            var frontSlots = ComputePhotoSlots(bottomHalf, frontLayout);
+            var frontSlots = _layoutCalculator.ComputePhotoSlots(bottomHalf, frontLayout);
             foreach (var (rect, slotIndex) in frontSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -293,7 +299,7 @@ public sealed class PdfExportService : IPdfExportService
         else
         {
             // Regular page: photo on one side, calendar on the other
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
 
             // Get photo layout for the photo month
             var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
@@ -301,7 +307,7 @@ public sealed class PdfExportService : IPdfExportService
                                 : project.LayoutSpec.PhotoLayout;
 
             // Draw photos
-            var photoSlots = ComputePhotoSlots(photoRect, photoLayout);
+            var photoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, photoLayout);
             foreach (var (rect, slotIndex) in photoSlots.Select((r, i) => (r, i)))
             {
                 sk.Save();
@@ -556,7 +562,7 @@ public sealed class PdfExportService : IPdfExportService
         {
             // Front cover - support multiple photo slots
             var layout = project.FrontCoverPhotoLayout;
-            var slots = ComputePhotoSlots(contentRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
@@ -577,7 +583,7 @@ public sealed class PdfExportService : IPdfExportService
         {
             // Back cover - support multiple photo slots
             var layout = project.BackCoverPhotoLayout;
-            var slots = ComputePhotoSlots(contentRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
@@ -596,12 +602,12 @@ public sealed class PdfExportService : IPdfExportService
         }
         else
         {
-            (SKRect photoRect, SKRect calRect) = ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
             var layout = project.MonthPhotoLayouts.TryGetValue(monthIndex, out var perMonth)
                 ? perMonth
                 : project.LayoutSpec.PhotoLayout;
             sk.Save();
-            var slots = ComputePhotoSlots(photoRect, layout);
+            var slots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             foreach (var (rect, slotIndex) in slots.Select((r, i) => (r, i)))
             {
                 sk.Save(); sk.ClipRect(rect, antialias: true);
