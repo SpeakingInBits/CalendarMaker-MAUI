@@ -28,10 +28,12 @@ public sealed class PdfExportService : IPdfExportService
 {
     private const float TargetDpi = 300f; // 300 DPI print quality
     private readonly ILayoutCalculator _layoutCalculator;
+    private readonly IImageProcessor _imageProcessor;
 
-    public PdfExportService(ILayoutCalculator layoutCalculator)
+    public PdfExportService(ILayoutCalculator layoutCalculator, IImageProcessor imageProcessor)
     {
         _layoutCalculator = layoutCalculator;
+        _imageProcessor = imageProcessor;
     }
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
@@ -267,7 +269,7 @@ public sealed class PdfExportService : IPdfExportService
                 var asset = project.ImageAssets.FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -339,7 +341,7 @@ public sealed class PdfExportService : IPdfExportService
 
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -570,7 +572,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault(a => a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -591,7 +593,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault(a => a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == slotIndex);
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -617,7 +619,7 @@ public sealed class PdfExportService : IPdfExportService
                     .FirstOrDefault();
                 if (asset != null && File.Exists(asset.Path))
                 {
-                    var bmp = GetOrLoadBitmap(asset.Path, imageCache);
+                    var bmp = _imageProcessor.GetOrLoadCached(asset.Path);
                     if (bmp != null)
                     {
                         DrawBitmapWithPanZoom(sk, bmp, rect, asset);
@@ -634,18 +636,6 @@ public sealed class PdfExportService : IPdfExportService
         // and adequate for intermediate format before PDF embedding
         using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 85);
         return data.ToArray();
-    }
-
-    private static SKBitmap? GetOrLoadBitmap(string path, System.Collections.Concurrent.ConcurrentDictionary<string, SKBitmap>? cache)
-    {
-        if (cache == null)
-        {
-            // No caching, decode on demand
-            return SKBitmap.Decode(path);
-        }
-
-        // Thread-safe get-or-add
-        return cache.GetOrAdd(path, p => SKBitmap.Decode(p));
     }
 
     private static (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)

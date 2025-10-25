@@ -32,10 +32,10 @@
 | 2.1 | Create ICalendarRenderer interface | ? | AI | 3h | Define rendering contracts - COMPLETE |
 | 2.2 | Implement CalendarRenderer | ? | AI | 12h | Extract all draw logic - COMPLETE |
 | 2.3 | Create ILayoutCalculator service | ? | AI | 6h | ComputeSlots, ComputeSplit - COMPLETE |
-| 2.4 | Create IImageProcessor service | ? | | 8h | Pan/zoom, bitmap caching |
+| 2.4 | Create IImageProcessor service | ? | AI | 8h | Pan/zoom, bitmap caching - COMPLETE |
 | 2.5 | Create specification objects | ? | | 4h | CalendarGridSpec, PhotoSlotSpec |
 
-**Phase 2 Total**: ~33 hours (21h complete, 12h remaining - 64% COMPLETE)
+**Phase 2 Total**: ~33 hours (29h complete, 4h remaining - 88% COMPLETE)
 
 ---
 
@@ -147,7 +147,7 @@
 | Phase | Priority | Est. Hours | Status |
 |-------|----------|------------|--------|
 | Phase 1: Foundation | HIGH | 16h | ?? In Progress (11.8h/16h - 74%) |
-| Phase 2: Rendering | HIGH | 33h | ?? In Progress (21h/33h - 64%) |
+| Phase 2: Rendering | HIGH | 33h | ?? In Progress (29h/33h - 88%) |
 | Phase 3: DesignerPage | HIGH | 44h | ? |
 | Phase 4: Services | MEDIUM | 36h | ? |
 | Phase 5: Testing | HIGH | 76h | ? |
@@ -155,7 +155,7 @@
 | Phase 7: Quality | MEDIUM | 40h | ? |
 | Phase 8: Performance | MEDIUM | 24h | ? |
 | Phase 9: Documentation | LOW | 17h | ? |
-| **TOTAL** | | **~312 hours** | **6/62 tasks (9.7%)**  + 3 bonus refactorings |
+| **TOTAL** | | **~312 hours** | **7/62 tasks (11.3%)**  + 5 bonus refactorings |
 
 ---
 
@@ -189,4 +189,7 @@
 | 2024-01 | 2.1 | Create ICalendarRenderer interface | 1h | Defined rendering contracts for calendar grids, photos, and covers. 6 key methods for complete rendering abstraction. |
 | 2024-01 | 2.2 | Implement CalendarRenderer | 3h | Extracted all SKCanvas drawing logic from DesignerPage. Centralized calendar grid, photo rendering, pan/zoom transforms. Eliminated ~200+ lines of duplicate rendering code. |
 | 2024-01 | ** | Refactor DesignerPage to use ICalendarRenderer | 0.5h | Replaced DrawCalendarGrid, DrawPhotos, DrawCover, and DrawBitmapWithPanZoom with CalendarRenderer service calls. Simplified rendering to service delegation. |
+| 2024-01 | 2.4 | Create IImageProcessor service | 2h | Extracted bitmap loading, caching, and pan/zoom calculations. Thread-safe concurrent caching for parallel export. Provides LoadBitmap, GetOrLoadCached, CalculateTransformedRect, CalculatePanLimits. |
+| 2024-01 | ** | Refactor CalendarRenderer to use IImageProcessor | 0.5h | Simplified RenderPhotoWithTransform to use ImageProcessor.CalculateTransformedRect. Centralized all bitmap transformation logic. |
+| 2024-01 | ** | Refactor PdfExportService to use IImageProcessor | 0.5h | Replaced GetOrLoadBitmap with ImageProcessor.GetOrLoadCached. Leveraged concurrent caching for parallel export operations. Improved memory management. |
 | ___ | ___ | ___ | ___ | ___ |

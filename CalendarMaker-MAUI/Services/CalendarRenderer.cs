@@ -11,10 +11,12 @@ namespace CalendarMaker_MAUI.Services;
 public sealed class CalendarRenderer : ICalendarRenderer
 {
     private readonly ICalendarEngine _calendarEngine;
+    private readonly IImageProcessor _imageProcessor;
 
-    public CalendarRenderer(ICalendarEngine calendarEngine)
+    public CalendarRenderer(ICalendarEngine calendarEngine, IImageProcessor imageProcessor)
     {
         _calendarEngine = calendarEngine;
+        _imageProcessor = imageProcessor;
     }
 
     /// <inheritdoc />
@@ -61,13 +63,16 @@ public sealed class CalendarRenderer : ICalendarRenderer
 
             if (asset != null && File.Exists(asset.Path))
             {
-                using var bitmap = SKBitmap.Decode(asset.Path);
+                var bitmap = _imageProcessor.LoadBitmap(asset.Path, useCache: false);
                 if (bitmap != null)
                 {
-                    canvas.Save();
-                    canvas.ClipRect(rect, antialias: true);
-                    RenderPhotoWithTransform(canvas, bitmap, rect, asset);
-                    canvas.Restore();
+                    using (bitmap)
+                    {
+                        canvas.Save();
+                        canvas.ClipRect(rect, antialias: true);
+                        RenderPhotoWithTransform(canvas, bitmap, rect, asset);
+                        canvas.Restore();
+                    }
                 }
             }
             else
@@ -89,35 +94,8 @@ public sealed class CalendarRenderer : ICalendarRenderer
     /// <inheritdoc />
     public void RenderPhotoWithTransform(SKCanvas canvas, SKBitmap bitmap, SKRect rect, ImageAsset asset)
     {
-        float imgW = bitmap.Width;
-        float imgH = bitmap.Height;
-        float rectW = rect.Width;
-        float rectH = rect.Height;
-        float imgAspect = imgW / imgH;
-        float rectAspect = rectW / rectH;
-
-        // Calculate base scale to cover the rectangle
-        float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
-
-        // Apply zoom (clamped between 0.5x and 3x)
-        float zoom = (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
-        float scale = baseScale * zoom;
-
-        float targetW = imgW * scale;
-        float targetH = imgH * scale;
-
-        // Calculate pan limits (how much excess space we have)
-        float excessX = Math.Max(0, (targetW - rectW) / 2f);
-        float excessY = Math.Max(0, (targetH - rectH) / 2f);
-
-        // Apply pan (clamped between -1 and 1)
-        float px = (float)Math.Clamp(asset.PanX, -1, 1);
-        float py = (float)Math.Clamp(asset.PanY, -1, 1);
-
-        // Calculate final position
-        float left = rect.Left - excessX + px * excessX;
-        float top = rect.Top - excessY + py * excessY;
-        var destRect = new SKRect(left, top, left + targetW, top + targetH);
+        // Use ImageProcessor to calculate the transformed rectangle
+        var destRect = _imageProcessor.CalculateTransformedRect(bitmap.Width, bitmap.Height, rect, asset);
 
         using var paint = new SKPaint
         {
