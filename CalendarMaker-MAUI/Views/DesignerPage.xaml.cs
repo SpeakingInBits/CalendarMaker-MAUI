@@ -889,70 +889,19 @@ public partial class DesignerPage : ContentPage
         else // Month page
         {
             (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, _project.LayoutSpec);
-            _lastPhotoRect = photoRect;
-            _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, _project.LayoutSpec.PhotoLayout);
+     
+            // Get the per-month layout override or default layout
+       var layout = _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var perMonth)
+         ? perMonth
+         : _project.LayoutSpec.PhotoLayout;
+            
+ _lastPhotoRect = photoRect;
+       _lastPhotoSlots = _layoutCalculator.ComputePhotoSlots(photoRect, layout);
             DrawPhotos(canvas, _lastPhotoSlots);
-            DrawCalendarGrid(canvas, calRect, _project);
+          DrawCalendarGrid(canvas, calRect, _project);
         }
 
         canvas.Restore();
-    }
-
-    private List<SKRect> ComputePhotoSlots(SKRect area, PhotoLayout layout, bool isCover = false)
-    {
-        if (!isCover && _project != null && _pageIndex >= 0 && _pageIndex <= 11 && _project.MonthPhotoLayouts.TryGetValue(_pageIndex, out var perMonth))
-            layout = perMonth;
-        const float gap = 4f;
-        var list = new List<SKRect>();
-        switch (layout)
-        {
-            case PhotoLayout.TwoVerticalSplit:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.Grid2x2:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.TwoHorizontalStack:
-                {
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.ThreeLeftStack:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Top + halfH));
-                    list.Add(new SKRect(area.Left, area.Top + halfH + gap, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Bottom));
-                    break;
-                }
-            case PhotoLayout.ThreeRightStack:
-                {
-                    float halfW = (area.Width - gap) / 2f;
-                    float halfH = (area.Height - gap) / 2f;
-                    list.Add(new SKRect(area.Left, area.Top, area.Left + halfW, area.Bottom));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top, area.Right, area.Top + halfH));
-                    list.Add(new SKRect(area.Left + halfW + gap, area.Top + halfH + gap, area.Right, area.Bottom));
-                    break;
-                }
-            default:
-                list.Add(area);
-                break;
-        }
-        return list;
     }
 
     private void DrawPhotos(SKCanvas canvas, List<SKRect> slots)
@@ -1144,19 +1093,6 @@ public partial class DesignerPage : ContentPage
         }
 
         e.Handled = false;
-    }
-
-    private (SKRect photo, SKRect cal) ComputeSplit(SKRect area, LayoutSpec spec)
-    {
-        var ratio = (float)Math.Clamp(spec.SplitRatio, 0.1, 0.9);
-        return spec.Placement switch
-        {
-            LayoutPlacement.PhotoLeftCalendarRight => (new SKRect(area.Left, area.Top, area.Left + area.Width * ratio, area.Bottom), new SKRect(area.Left + area.Width * ratio, area.Top, area.Right, area.Bottom)),
-            LayoutPlacement.PhotoRightCalendarLeft => (new SKRect(area.Left + area.Width * (1 - ratio), area.Top, area.Right, area.Bottom), new SKRect(area.Left, area.Top, area.Left + area.Width * (1 - ratio), area.Bottom)),
-            LayoutPlacement.PhotoTopCalendarBottom => (new SKRect(area.Left, area.Top, area.Right, area.Top + area.Height * ratio), new SKRect(area.Left, area.Top + area.Height * ratio, area.Right, area.Bottom)),
-            LayoutPlacement.PhotoBottomCalendarTop => (new SKRect(area.Left, area.Top + area.Height * (1 - ratio), area.Right, area.Bottom), new SKRect(area.Left, area.Top, area.Right, area.Top + area.Height * (1 - ratio))),
-            _ => (area, area)
-        };
     }
 
     private void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project)
