@@ -54,8 +54,7 @@ public partial class DesignerPage : ContentPage
                 e.PropertyName == nameof(DesignerViewModel.Project) ||
                 e.PropertyName == nameof(DesignerViewModel.SplitRatio) ||
                 e.PropertyName == nameof(DesignerViewModel.ZoomValue) ||
-                e.PropertyName == nameof(DesignerViewModel.SelectedPhotoLayoutIndex) ||
-                e.PropertyName == nameof(DesignerViewModel.BorderlessChecked))
+                e.PropertyName == nameof(DesignerViewModel.SelectedPhotoLayoutIndex))
             {
                 _canvas.InvalidateSurface();
             }
@@ -152,11 +151,8 @@ public partial class DesignerPage : ContentPage
 
         int pageIndex = _viewModel.PageIndex;
 
-        if (pageIndex == -1 && project.CoverSpec.BorderlessFrontCover)
-        {
-            contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
-        }
-        else if (pageIndex == 12 && project.CoverSpec.BorderlessBackCover)
+        // Use BorderlessCalendar property for all pages when enabled
+        if (project.CoverSpec.BorderlessCalendar)
         {
             contentRect = new SKRect(0, 0, (float)pageWpt, (float)pageHpt);
         }
@@ -197,9 +193,13 @@ public partial class DesignerPage : ContentPage
 
     private bool IsBorderless(CalendarProject project)
     {
-        int pageIndex = _viewModel.PageIndex;
-        return (pageIndex == -1 && project.CoverSpec.BorderlessFrontCover) ||
-               (pageIndex == 12 && project.CoverSpec.BorderlessBackCover);
+        return project.CoverSpec.BorderlessCalendar;
+    }
+
+    private bool IsMonthPageBorderless(CalendarProject project)
+    {
+        // Month pages are borderless if the calendar-wide setting is enabled
+        return project.CoverSpec.BorderlessCalendar;
     }
 
     private void RenderPageContent(SKCanvas canvas, CalendarProject project, SKRect contentRect)
@@ -245,8 +245,10 @@ public partial class DesignerPage : ContentPage
                 _viewModel.PageIndex,
                 activeSlotIndex);
 
-            // Draw calendar for previous year
-            _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12);
+            // Draw calendar for previous year with background if borderless
+            bool applyCalendarBackground = IsMonthPageBorderless(project) && 
+     project.CoverSpec.UseCalendarBackgroundOnBorderless;
+       _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12, applyCalendarBackground);
         }
         else if (pageIndex == 12) // Back cover
         {
@@ -285,7 +287,11 @@ public partial class DesignerPage : ContentPage
 
             int month = ((project.StartMonth - 1 + pageIndex) % 12) + 1;
             int year = project.Year + (project.StartMonth - 1 + pageIndex) / 12;
-            _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, year, month);
+
+            // Apply background to calendar area if this is a borderless month page
+            bool applyCalendarBackground = IsMonthPageBorderless(project) &&
+                                          project.CoverSpec.UseCalendarBackgroundOnBorderless;
+            _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, year, month, applyCalendarBackground);
         }
     }
 

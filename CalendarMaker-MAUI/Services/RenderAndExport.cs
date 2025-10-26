@@ -527,23 +527,18 @@ public sealed class PdfExportService : IPdfExportService
 
         // Use full page for borderless covers, otherwise use margins
         var m = project.Margins;
-        SKRect contentRect;
+      SKRect contentRect;
 
-        if (renderCover && project.CoverSpec.BorderlessFrontCover)
+        if (project.CoverSpec.BorderlessCalendar)
+ {
+      // Borderless mode - use full page
+    contentRect = new SKRect(0, 0, pageWpt, pageHpt);
+}
+    else
         {
-            // Front cover with borderless - use full page
-            contentRect = new SKRect(0, 0, pageWpt, pageHpt);
-        }
-        else if (renderBackCover && project.CoverSpec.BorderlessBackCover)
-        {
-            // Back cover with borderless - use full page
-            contentRect = new SKRect(0, 0, pageWpt, pageHpt);
-        }
-        else
-        {
-            // Normal margins
-            contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
-        }
+      // Normal margins
+ contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
+   }
 
         if (renderCover)
         {
@@ -612,7 +607,11 @@ public sealed class PdfExportService : IPdfExportService
                 }
                 sk.Restore();
             }
-            DrawCalendarGrid(sk, calRect, project, monthIndex);
+            
+            // Apply background to calendar area if this is a borderless month page
+      bool applyCalendarBackground = IsMonthPageBorderless(project) &&  
+      project.CoverSpec.UseCalendarBackgroundOnBorderless;
+          DrawCalendarGrid(sk, calRect, project, monthIndex, applyCalendarBackground);
         }
 
         sk.Flush();
@@ -693,41 +692,216 @@ public sealed class PdfExportService : IPdfExportService
         float titleWidth = titlePaint.MeasureText(title);
         canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
 
-        float dowH = 20;
+        // NOW draw white rectangle to cut out background, but only BELOW the header
+        // This leaves the header in the colored area
+        using var clearPaint = new SKPaint
+        {
+            Color = SKColors.White,
+            Style = SKPaintStyle.Fill
+        };
+        canvas.DrawRect(gridRect, clearPaint);
+
+        // Render day-of-week headers
+      float dowH = 20;
         var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
         string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         int shift = (int)project.FirstDayOfWeek;
-        string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
+     string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
 
-        using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
-        using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
+  using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
+   using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
 
         float colW = dowRect.Width / 7f;
         for (int c = 0; c < 7; c++)
-        {
-            var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
-            string t = displayDows[c];
-            float tw = textPaint.MeasureText(t);
+      {
+       var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+     string t = displayDows[c];
+     float tw = textPaint.MeasureText(t);
             canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-            canvas.DrawRect(cell, gridPen);
-        }
+        canvas.DrawRect(cell, gridPen);
+   }
 
-        var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
+        // Render day grid
+   var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
         int rows = weeks.Count;
         float rowH = weeksArea.Height / rows;
         for (int r = 0; r < rows; r++)
         {
-            for (int c = 0; c < 7; c++)
-            {
-                var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-                canvas.DrawRect(cell, gridPen);
-                var date = weeks[r][c];
-                if (date.HasValue && date.Value.Month == month)
-                {
-                    string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
-                    canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-                }
-            }
+      for (int c = 0; c < 7; c++)
+       {
+            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
+           canvas.DrawRect(cell, gridPen);
+              var date = weeks[r][c];
+        if (date.HasValue && date.Value.Month == month)
+        {
+       string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+        canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
         }
+         }
+        }
+    }
+
+    private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex, bool applyBackground)
+    {
+        SKRect calendarRect = bounds;
+
+        // Apply padding to the calendar grid if in borderless mode
+  if (applyBackground && project.CoverSpec.BorderlessCalendar)
+     {
+   float topPadding = (float)project.CoverSpec.CalendarTopPaddingPt;
+     float sidePadding = (float)project.CoverSpec.CalendarSidePaddingPt;
+      float bottomPadding = (float)project.CoverSpec.CalendarBottomPaddingPt;
+
+            calendarRect = new SKRect(
+       bounds.Left + sidePadding,
+bounds.Top + topPadding,
+bounds.Right - sidePadding,
+     bounds.Bottom - bottomPadding
+      );
+
+       // Draw background color ONLY in the padding area (not under the calendar grid)
+  if (!string.IsNullOrEmpty(project.Theme.BackgroundColor))
+      {
+    using var bgPaint = new SKPaint
+   {
+   Color = SKColor.Parse(project.Theme.BackgroundColor),
+      Style = SKPaintStyle.Fill
+    };
+  
+       // Draw background in the full bounds area
+  canvas.DrawRect(bounds, bgPaint);
+  
+  // Get month and year for the month name
+ int month, year;
+  if (monthIndex == -1)
+       {
+   month = 12;
+    year = project.Year - 1;
+     }
+      else
+   {
+        month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
+         year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
+         }
+
+    // Render calendar with header in colored area
+       DrawCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month);
+    return;
+   }
+        }
+ else if (applyBackground && !string.IsNullOrEmpty(project.Theme.BackgroundColor))
+      {
+   // Non-borderless mode: fill entire area with background
+       using var bgPaint = new SKPaint
+{
+ Color = SKColor.Parse(project.Theme.BackgroundColor),
+Style = SKPaintStyle.Fill
+   };
+      canvas.DrawRect(bounds, bgPaint);
+    }
+
+// Draw standard calendar grid
+   DrawCalendarGrid(canvas, calendarRect, project, monthIndex);
+    }
+
+    private static void DrawCalendarGridWithHeaderInPadding(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month)
+  {
+  var engine = new CalendarEngine();
+  var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
+
+    float headerH = 40;
+  var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
+   var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
+
+        // Render month/year title - this will appear in the colored padding area
+   // Determine text color based on background
+     SKColor titleColor = GetContrastingTextColor(project.Theme.BackgroundColor);
+  using var titlePaint = new SKPaint 
+        { 
+   Color = titleColor, 
+TextSize = 18, 
+  IsAntialias = true 
+   };
+    
+ string title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+     float titleWidth = titlePaint.MeasureText(title);
+   canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
+
+   // NOW draw white rectangle to cut out background, but only BELOW the header
+  // This leaves the header in the colored area
+        using var clearPaint = new SKPaint
+        {
+   Color = SKColors.White,
+ Style = SKPaintStyle.Fill
+ };
+  canvas.DrawRect(gridRect, clearPaint);
+
+ // Render day-of-week headers
+      float dowH = 20;
+    var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
+      string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    int shift = (int)project.FirstDayOfWeek;
+     string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
+
+  using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
+   using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
+
+        float colW = dowRect.Width / 7f;
+        for (int c = 0; c < 7; c++)
+      {
+       var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
+     string t = displayDows[c];
+   float tw = textPaint.MeasureText(t);
+    canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
+        canvas.DrawRect(cell, gridPen);
+   }
+
+        // Render day grid
+   var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
+        int rows = weeks.Count;
+        float rowH = weeksArea.Height / rows;
+        for (int r = 0; r < rows; r++)
+        {
+      for (int c = 0; c < 7; c++)
+       {
+            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
+           canvas.DrawRect(cell, gridPen);
+       var date = weeks[r][c];
+    if (date.HasValue && date.Value.Month == month)
+        {
+     string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
+        canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+        }
+      }
+     }
+    }
+
+    private static SKColor GetContrastingTextColor(string? backgroundColor)
+    {
+  if (string.IsNullOrEmpty(backgroundColor))
+        {
+   return SKColors.Black;
+   }
+
+  try
+   {
+      SKColor bgColor = SKColor.Parse(backgroundColor);
+   
+ // Calculate relative luminance
+         float luminance = (0.299f * bgColor.Red + 0.587f * bgColor.Green + 0.114f * bgColor.Blue) / 255f;
+   
+  // Use white text for dark backgrounds, black for light backgrounds
+    return luminance > 0.5f ? SKColors.Black : SKColors.White;
+        }
+        catch
+      {
+     return SKColors.Black;
+  }
+    }
+
+    private static bool IsMonthPageBorderless(CalendarProject project)
+  {
+        // Check if borderless calendar mode is enabled
+        return project.CoverSpec.BorderlessCalendar;
     }
 }

@@ -20,6 +20,17 @@ public interface ICalendarRenderer
     void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month);
 
     /// <summary>
+    /// Renders a complete calendar page including photos and calendar grid with optional background.
+    /// </summary>
+    /// <param name="canvas">The SKCanvas to render to.</param>
+    /// <param name="bounds">The bounding rectangle for the calendar section.</param>
+    /// <param name="project">The calendar project containing theme and settings.</param>
+    /// <param name="year">The year to render.</param>
+    /// <param name="month">The month to render (1-12).</param>
+    /// <param name="applyBackground">Whether to apply the theme's background color.</param>
+    void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, bool applyBackground);
+
+    /// <summary>
     /// Renders photos in their designated slots with pan/zoom applied.
     /// </summary>
     /// <param name="canvas">The SKCanvas to render to.</param>

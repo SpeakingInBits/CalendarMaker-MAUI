@@ -78,16 +78,159 @@
 
       <BoxView HeightRequest="1" Color="LightGray" />
 
-        <!-- Additional Settings Section (Future) -->
+   <!-- Borderless Calendar Section -->
+        <VerticalStackLayout Spacing="10">
+<Label Text="Borderless Calendar" 
+       FontSize="18" 
+        FontAttributes="Bold" />
+<Label Text="Enable borderless mode for the entire calendar (all pages will have zero margins)." 
+       FontSize="12" 
+           TextColor="Gray" />
+
+  <!-- Borderless Toggle -->
+            <HorizontalStackLayout Spacing="6">
+<CheckBox x:Name="BorderlessCalendarCheckbox" 
+     VerticalOptions="Center" />
+          <Label Text="Enable borderless calendar (zero margins)" 
+     VerticalOptions="Center" />
+   </HorizontalStackLayout>
+
+    <!-- Top Padding -->
+          <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
+ <Label Text="Top Padding" VerticalOptions="Center" />
+            <Slider x:Name="CalendarTopPaddingSlider" 
+         Grid.Column="1"
+     Minimum="0" 
+   Maximum="0.3" 
+            VerticalOptions="Center" />
+        <Label Grid.Column="2" 
+               Text="{Binding Source={x:Reference CalendarTopPaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+    </Grid>
+
+      <!-- Side Padding -->
+          <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
+ <Label Text="Side Padding (L/R)" VerticalOptions="Center" />
+     <Slider x:Name="CalendarSidePaddingSlider" 
+         Grid.Column="1"
+     Minimum="0" 
+          Maximum="0.5" 
+            VerticalOptions="Center" />
+          <Label Grid.Column="2" 
+     Text="{Binding Source={x:Reference CalendarSidePaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+            </Grid>
+
+      <!-- Bottom Padding -->
+          <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
+ <Label Text="Bottom Padding" VerticalOptions="Center" />
+            <Slider x:Name="CalendarBottomPaddingSlider" 
+         Grid.Column="1"
+            Minimum="0" 
+    Maximum="0.5" 
+        VerticalOptions="Center" />
+      <Label Grid.Column="2" 
+      Text="{Binding Source={x:Reference CalendarBottomPaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+            </Grid>
+
+<Label Text="Space around the calendar grid (filled with background color). Only applies to month pages in borderless mode." 
+   FontSize="11" 
+  TextColor="Gray" 
+       Margin="0,-5,0,0" />
+ </VerticalStackLayout>
+
+        <BoxView HeightRequest="1" Color="LightGray" />
+
+        <!-- Calendar Settings Section -->
     <VerticalStackLayout Spacing="10">
-      <Label Text="Theme and Colors" 
-     FontSize="18" 
-       FontAttributes="Bold" />
-        <Label Text="Additional theme settings coming soon..." 
-     FontSize="12" 
-      TextColor="Gray" 
-      FontAttributes="Italic" />
-                </VerticalStackLayout>
+            <Label Text="Calendar Settings" 
+      FontSize="18" 
+           FontAttributes="Bold" />
+            <Label Text="Configure the calendar year, start month, and week settings." 
+       FontSize="12" 
+    TextColor="Gray" />
+
+<!-- Year -->
+            <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
+     <Label Text="Year" VerticalOptions="Center" />
+      <Entry x:Name="YearEntry" 
+                Grid.Column="1"
+       Keyboard="Numeric" 
+     Placeholder="e.g. 2025"
+  VerticalOptions="Center" />
+        </Grid>
+
+            <!-- Start Month -->
+        <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
+      <Label Text="Start Month" VerticalOptions="Center" />
+         <Picker x:Name="StartMonthPicker"
+   Grid.Column="1"
+    VerticalOptions="Center" />
+        </Grid>
+
+         <!-- First Day of Week -->
+   <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
+        <Label Text="First Day of Week" VerticalOptions="Center" />
+                <Picker x:Name="FirstDayOfWeekPicker"
+   Grid.Column="1"
+     VerticalOptions="Center" />
+   </Grid>
+
+            <!-- Double-sided calendar toggle -->
+            <HorizontalStackLayout Spacing="6">
+   <CheckBox x:Name="DoubleSidedCheckbox" 
+   VerticalOptions="Center" />
+      <Label Text="Double-Sided Calendar" 
+   VerticalOptions="Center" />
+            </HorizontalStackLayout>
+  </VerticalStackLayout>
+
+        <BoxView HeightRequest="1" Color="LightGray" />
+
+        <!-- Calendar Background Section -->
+   <VerticalStackLayout Spacing="10">
+        <Label Text="Calendar Background (Borderless Pages)" 
+    FontSize="18" 
+   FontAttributes="Bold" />
+     <Label Text="When month pages have zero margins, apply a background color to the calendar area." 
+        FontSize="12" 
+   TextColor="Gray" />
+
+    <!-- Use Background Toggle -->
+ <HorizontalStackLayout Spacing="6">
+      <CheckBox x:Name="UseCalendarBackgroundCheckbox" 
+   VerticalOptions="Center" />
+       <Label Text="Use calendar background on borderless month pages" 
+     VerticalOptions="Center" />
+   </HorizontalStackLayout>
+
+   <!-- Background Color Entry -->
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto">
+  <Label Text="Background Color" VerticalOptions="Center" />
+    <!-- Color picker using Border with visual feedback -->
+        <HorizontalStackLayout Grid.Column="1" Spacing="10">
+     <Border x:Name="ColorPreview"
+        WidthRequest="40"
+   HeightRequest="40"
+    BackgroundColor="##bedae3"
+  StrokeThickness="1"
+     Stroke="Gray"
+   StrokeShape="RoundRectangle 4,4,4,4"
+     VerticalOptions="Center">
+         <Border.GestureRecognizers>
+      <TapGestureRecognizer x:Name="ColorPickerTap" />
+    </Border.GestureRecognizers>
+          </Border>
+  <Entry x:Name="BackgroundColorEntry" 
+       HorizontalOptions="FillAndExpand"
+     Placeholder="#bedae3" 
+ VerticalOptions="Center"
+          MaxLength="7"
+          TextChanged="OnBackgroundColorChanged" />
+          </HorizontalStackLayout>
+        </Grid>
+   </VerticalStackLayout>
      </VerticalStackLayout>
         </ScrollView>
 

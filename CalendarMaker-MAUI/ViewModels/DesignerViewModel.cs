@@ -53,12 +53,6 @@ public sealed partial class DesignerViewModel : ObservableObject
     private bool _splitControlVisible = false;
 
     [ObservableProperty]
-    private bool _borderlessControlVisible = false;
-
-    [ObservableProperty]
-    private bool _borderlessChecked = false;
-
-    [ObservableProperty]
     private int _selectedPhotoLayoutIndex = 0;
 
     [ObservableProperty]
@@ -684,31 +678,12 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     partial void OnYearTextChanged(string value)
     {
-        if (Project != null && int.TryParse(value, out var year) && year >= 1900 && year <= 2100)
+  if (Project != null && int.TryParse(value, out var year) && year >= 1900 && year <= 2100)
         {
-            Project.Year = year;
-            UpdatePageLabel();
+         Project.Year = year;
+     UpdatePageLabel();
             _ = _storage.UpdateProjectAsync(Project);
         }
-    }
-
-    partial void OnBorderlessCheckedChanged(bool value)
-    {
-        if (Project == null)
-        {
-            return;
-        }
-
-        if (PageIndex == -1)
-        {
-            Project.CoverSpec.BorderlessFrontCover = value;
-        }
-        else if (PageIndex == 12)
-        {
-            Project.CoverSpec.BorderlessBackCover = value;
-        }
-
-        _ = _storage.UpdateProjectAsync(Project);
     }
 
     #endregion
@@ -751,17 +726,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     {
         bool isCoverOrPrevDec = PageIndex == -2 || PageIndex == -1 || PageIndex == 12;
         SplitControlVisible = !isCoverOrPrevDec;
-
-        bool isCoverPage = PageIndex == -1 || PageIndex == 12;
-        BorderlessControlVisible = isCoverPage;
-
-        if (Project != null && isCoverPage)
-        {
-            BorderlessChecked = PageIndex == -1
-                   ? Project.CoverSpec.BorderlessFrontCover
-                  : Project.CoverSpec.BorderlessBackCover;
-        }
-    }
+  }
 
     private void SyncPhotoLayoutPicker()
     {
