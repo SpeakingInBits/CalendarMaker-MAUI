@@ -26,6 +26,26 @@ public partial class ProjectSettingsModal : ContentPage
         CalendarSidePaddingSlider.Value = _project.CoverSpec.CalendarSidePaddingPt / 72.0;
         CalendarBottomPaddingSlider.Value = _project.CoverSpec.CalendarBottomPaddingPt / 72.0;
 
+        // Initialize calendar settings
+        YearEntry.Text = _project.Year.ToString();
+
+        // Populate month names
+        StartMonthPicker.ItemsSource = new List<string>
+        {
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        };
+        StartMonthPicker.SelectedIndex = _project.StartMonth - 1;
+
+        // Populate day of week names
+        FirstDayOfWeekPicker.ItemsSource = new List<string>
+        {
+            "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+        };
+        FirstDayOfWeekPicker.SelectedIndex = (int)_project.FirstDayOfWeek;
+
+        DoubleSidedCheckbox.IsChecked = _project.EnableDoubleSided;
+
         // Initialize calendar background settings
         UseCalendarBackgroundCheckbox.IsChecked = _project.CoverSpec.UseCalendarBackgroundOnBorderless;
         BackgroundColorEntry.Text = _project.Theme.BackgroundColor ?? "#FFFFFF";
@@ -154,6 +174,16 @@ public partial class ProjectSettingsModal : ContentPage
                 _project.CoverSpec.BorderlessFrontCover = false;
                 _project.CoverSpec.BorderlessBackCover = false;
             }
+
+            // Update calendar settings
+            if (int.TryParse(YearEntry.Text, out int year) && year >= 1900 && year <= 2100)
+            {
+                _project.Year = year;
+            }
+
+            _project.StartMonth = StartMonthPicker.SelectedIndex + 1;
+            _project.FirstDayOfWeek = (DayOfWeek)FirstDayOfWeekPicker.SelectedIndex;
+            _project.EnableDoubleSided = DoubleSidedCheckbox.IsChecked;
 
             // Update calendar background settings
             _project.CoverSpec.UseCalendarBackgroundOnBorderless = UseCalendarBackgroundCheckbox.IsChecked;
