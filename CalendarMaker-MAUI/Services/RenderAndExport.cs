@@ -351,7 +351,9 @@ public sealed class PdfExportService : IPdfExportService
             }
 
             // Draw calendar for the calendar month
-            DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex);
+            bool applyCalendarBackground = IsMonthPageBorderless(project) &&  
+              project.CoverSpec.UseCalendarBackgroundOnBorderless;
+            DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex, applyCalendarBackground);
         }
 
         sk.Flush();
