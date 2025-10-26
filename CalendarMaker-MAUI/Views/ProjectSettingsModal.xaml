@@ -95,20 +95,47 @@
      VerticalOptions="Center" />
    </HorizontalStackLayout>
 
-      <!-- Calendar Padding -->
+    <!-- Top Padding -->
           <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
- <Label Text="Calendar Padding" VerticalOptions="Center" />
-            <Slider x:Name="CalendarPaddingSlider" 
+ <Label Text="Top Padding" VerticalOptions="Center" />
+            <Slider x:Name="CalendarTopPaddingSlider" 
          Grid.Column="1"
-            Minimum="0" 
+     Minimum="0" 
+   Maximum="0.3" 
+            VerticalOptions="Center" />
+        <Label Grid.Column="2" 
+               Text="{Binding Source={x:Reference CalendarTopPaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+    </Grid>
+
+      <!-- Side Padding -->
+          <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
+ <Label Text="Side Padding (L/R)" VerticalOptions="Center" />
+     <Slider x:Name="CalendarSidePaddingSlider" 
+         Grid.Column="1"
+     Minimum="0" 
           Maximum="0.5" 
             VerticalOptions="Center" />
           <Label Grid.Column="2" 
-               Text="{Binding Source={x:Reference CalendarPaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     Text="{Binding Source={x:Reference CalendarSidePaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
      VerticalOptions="Center" />
             </Grid>
-       <Label Text="Space around the calendar grid (filled with background color). Only applies to month pages in borderless mode." 
-             FontSize="11" 
+
+      <!-- Bottom Padding -->
+          <Grid ColumnDefinitions="150,*,60" ColumnSpacing="10">
+ <Label Text="Bottom Padding" VerticalOptions="Center" />
+            <Slider x:Name="CalendarBottomPaddingSlider" 
+         Grid.Column="1"
+            Minimum="0" 
+    Maximum="0.5" 
+        VerticalOptions="Center" />
+      <Label Grid.Column="2" 
+      Text="{Binding Source={x:Reference CalendarBottomPaddingSlider}, Path=Value, StringFormat='{0:F2} in'}" 
+     VerticalOptions="Center" />
+            </Grid>
+
+<Label Text="Space around the calendar grid (filled with background color). Only applies to month pages in borderless mode." 
+   FontSize="11" 
   TextColor="Gray" 
        Margin="0,-5,0,0" />
  </VerticalStackLayout>
@@ -140,7 +167,7 @@
      <Border x:Name="ColorPreview"
         WidthRequest="40"
    HeightRequest="40"
-    BackgroundColor="#FFFFFF"
+    BackgroundColor="##bedae3"
   StrokeThickness="1"
      Stroke="Gray"
    StrokeShape="RoundRectangle 4,4,4,4"
@@ -151,7 +178,7 @@
           </Border>
   <Entry x:Name="BackgroundColorEntry" 
        HorizontalOptions="FillAndExpand"
-     Placeholder="#FFFFFF" 
+     Placeholder="#bedae3" 
  VerticalOptions="Center"
           MaxLength="7"
           TextChanged="OnBackgroundColorChanged" />

@@ -61,15 +61,18 @@ public sealed class CalendarRenderer : ICalendarRenderer
         // Apply padding to the calendar grid if in borderless mode
         if (applyBackground && project.CoverSpec.BorderlessCalendar)
         {
-         float padding = (float)project.CoverSpec.CalendarPaddingPt;
-    calendarRect = new SKRect(
-     bounds.Left + padding,
-  bounds.Top + padding,
-         bounds.Right - padding,
-    bounds.Bottom - padding
+         float topPadding = (float)project.CoverSpec.CalendarTopPaddingPt;
+      float sidePadding = (float)project.CoverSpec.CalendarSidePaddingPt;
+    float bottomPadding = (float)project.CoverSpec.CalendarBottomPaddingPt;
+
+        calendarRect = new SKRect(
+     bounds.Left + sidePadding,
+  bounds.Top + topPadding,
+         bounds.Right - sidePadding,
+    bounds.Bottom - bottomPadding
         );
 
-         // Draw background color ONLY in the padding area (not under the calendar grid)
+    // Draw background color ONLY in the padding area (not under the calendar grid)
    if (!string.IsNullOrEmpty(project.Theme.BackgroundColor))
    {
     using var bgPaint = new SKPaint
@@ -78,11 +81,11 @@ Color = SKColor.Parse(project.Theme.BackgroundColor),
 Style = SKPaintStyle.Fill
    };
    
-         // Draw background in the full bounds area
+     // Draw background in the full bounds area
        canvas.DrawRect(bounds, bgPaint);
  
    // Draw white/transparent rectangle over the calendar grid area (EXCEPT the header)
-      // to "cut out" the background, leaving the header in the colored area
+   // to "cut out" the background, leaving the header in the colored area
      RenderCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month);
             return;
     }
@@ -90,7 +93,7 @@ Style = SKPaintStyle.Fill
         else if (applyBackground && !string.IsNullOrEmpty(project.Theme.BackgroundColor))
    {
    // Non-borderless mode: fill entire area with background
-     using var bgPaint = new SKPaint
+ using var bgPaint = new SKPaint
    {
       Color = SKColor.Parse(project.Theme.BackgroundColor),
      Style = SKPaintStyle.Fill
@@ -99,7 +102,7 @@ Style = SKPaintStyle.Fill
      }
 
       // Render the standard calendar grid
-    RenderCalendarGrid(canvas, calendarRect, project, year, month);
+  RenderCalendarGrid(canvas, calendarRect, project, year, month);
     }
 
     /// <inheritdoc />

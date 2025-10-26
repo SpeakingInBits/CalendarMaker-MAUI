@@ -748,12 +748,15 @@ public sealed class PdfExportService : IPdfExportService
         // Apply padding to the calendar grid if in borderless mode
   if (applyBackground && project.CoverSpec.BorderlessCalendar)
      {
-   float padding = (float)project.CoverSpec.CalendarPaddingPt;
-  calendarRect = new SKRect(
-       bounds.Left + padding,
-bounds.Top + padding,
-   bounds.Right - padding,
-     bounds.Bottom - padding
+   float topPadding = (float)project.CoverSpec.CalendarTopPaddingPt;
+     float sidePadding = (float)project.CoverSpec.CalendarSidePaddingPt;
+      float bottomPadding = (float)project.CoverSpec.CalendarBottomPaddingPt;
+
+            calendarRect = new SKRect(
+       bounds.Left + sidePadding,
+bounds.Top + topPadding,
+bounds.Right - sidePadding,
+     bounds.Bottom - bottomPadding
       );
 
        // Draw background color ONLY in the padding area (not under the calendar grid)
@@ -768,8 +771,8 @@ bounds.Top + padding,
        // Draw background in the full bounds area
   canvas.DrawRect(bounds, bgPaint);
   
-      // Get month and year for the month name
-            int month, year;
+  // Get month and year for the month name
+ int month, year;
   if (monthIndex == -1)
        {
    month = 12;
@@ -778,10 +781,10 @@ bounds.Top + padding,
       else
    {
         month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
-           year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
+         year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
          }
 
-        // Render calendar with header in colored area
+    // Render calendar with header in colored area
        DrawCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month);
     return;
    }
@@ -792,7 +795,7 @@ bounds.Top + padding,
        using var bgPaint = new SKPaint
 {
  Color = SKColor.Parse(project.Theme.BackgroundColor),
-      Style = SKPaintStyle.Fill
+Style = SKPaintStyle.Fill
    };
       canvas.DrawRect(bounds, bgPaint);
     }

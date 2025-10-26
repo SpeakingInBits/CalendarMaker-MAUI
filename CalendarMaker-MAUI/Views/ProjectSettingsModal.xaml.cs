@@ -22,7 +22,9 @@ public partial class ProjectSettingsModal : ContentPage
 
         // Initialize borderless calendar settings
         BorderlessCalendarCheckbox.IsChecked = _project.CoverSpec.BorderlessCalendar;
-        CalendarPaddingSlider.Value = _project.CoverSpec.CalendarPaddingPt / 72.0;
+        CalendarTopPaddingSlider.Value = _project.CoverSpec.CalendarTopPaddingPt / 72.0;
+        CalendarSidePaddingSlider.Value = _project.CoverSpec.CalendarSidePaddingPt / 72.0;
+        CalendarBottomPaddingSlider.Value = _project.CoverSpec.CalendarBottomPaddingPt / 72.0;
 
         // Initialize calendar background settings
         UseCalendarBackgroundCheckbox.IsChecked = _project.CoverSpec.UseCalendarBackgroundOnBorderless;
@@ -133,7 +135,9 @@ public partial class ProjectSettingsModal : ContentPage
 
             // Update borderless calendar settings
             _project.CoverSpec.BorderlessCalendar = BorderlessCalendarCheckbox.IsChecked;
-            _project.CoverSpec.CalendarPaddingPt = CalendarPaddingSlider.Value * 72.0;
+            _project.CoverSpec.CalendarTopPaddingPt = CalendarTopPaddingSlider.Value * 72.0;
+            _project.CoverSpec.CalendarSidePaddingPt = CalendarSidePaddingSlider.Value * 72.0;
+            _project.CoverSpec.CalendarBottomPaddingPt = CalendarBottomPaddingSlider.Value * 72.0;
 
             // If borderless is enabled, set all margins to 0
             if (_project.CoverSpec.BorderlessCalendar)
