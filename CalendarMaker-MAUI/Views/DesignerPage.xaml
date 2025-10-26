@@ -51,15 +51,6 @@
                 <Button Text="Flip Layout" 
                         Command="{Binding FlipLayoutCommand}" />
         
-                <!-- Borderless checkbox (only visible on cover pages) -->
-                <HorizontalStackLayout x:Name="BorderlessControl" Spacing="6" 
-                                       IsVisible="{Binding BorderlessControlVisible}">
-                    <CheckBox IsChecked="{Binding BorderlessChecked}" 
-                              VerticalOptions="Center" />
-                    <Label Text="Borderless (no margins)" 
-                           VerticalOptions="Center" />
-                </HorizontalStackLayout>
-                
                 <!-- Split slider with reset -->
                 <Grid x:Name="SplitControlGrid" 
                       ColumnDefinitions="Auto,*,Auto,Auto" 
