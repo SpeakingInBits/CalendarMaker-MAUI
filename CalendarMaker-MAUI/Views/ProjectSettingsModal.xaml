@@ -19,6 +19,24 @@
             FontSize="12" 
            TextColor="Gray" />
 
+     <!-- Page Size Picker -->
+          <Grid ColumnDefinitions="100,*" ColumnSpacing="10">
+       <Label Text="Page Size" VerticalOptions="Center" />
+         <Picker x:Name="PageSizePicker"
+                Grid.Column="1"
+         VerticalOptions="Center"
+          SelectedIndexChanged="OnPageSizeChanged" />
+            </Grid>
+
+  <!-- Page Orientation Picker -->
+   <Grid ColumnDefinitions="100,*" ColumnSpacing="10">
+            <Label Text="Orientation" VerticalOptions="Center" />
+  <Picker x:Name="OrientationPicker"
+          Grid.Column="1"
+  VerticalOptions="Center"
+       SelectedIndexChanged="OnOrientationChanged" />
+        </Grid>
+
      <!-- Top Margin -->
            <Grid ColumnDefinitions="100,*,60" ColumnSpacing="10">
     <Label Text="Top" VerticalOptions="Center" />
