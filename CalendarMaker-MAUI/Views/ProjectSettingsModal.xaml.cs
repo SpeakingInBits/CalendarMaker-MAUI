@@ -14,6 +14,34 @@ public partial class ProjectSettingsModal : ContentPage
         InitializeComponent();
         _project = project;
 
+        // Initialize page size picker
+        PageSizePicker.ItemsSource = new List<string>
+        {
+            "5×7 inches",
+            "Letter (8.5×11 inches)",
+            "Tabloid/Ledger (11×17 inches)",
+            "Super B (13×19 inches)"
+        };
+
+        // Set current page size
+        PageSizePicker.SelectedIndex = _project.PageSpec.Size switch
+        {
+            PageSize.FiveBySeven => 0,
+            PageSize.Letter => 1,
+            PageSize.Tabloid_11x17 => 2,
+            PageSize.SuperB_13x19 => 3,
+            _ => 1 // Default to Letter
+        };
+
+        // Initialize orientation picker
+        OrientationPicker.ItemsSource = new List<string>
+        {
+            "Portrait",
+            "Landscape"
+        };
+
+        OrientationPicker.SelectedIndex = _project.PageSpec.Orientation == PageOrientation.Portrait ? 0 : 1;
+
         // Initialize margin sliders with current values (convert points to inches)
         TopMarginSlider.Value = _project.Margins.TopPt / 72.0;
         BottomMarginSlider.Value = _project.Margins.BottomPt / 72.0;
@@ -56,11 +84,39 @@ public partial class ProjectSettingsModal : ContentPage
         ApplyBtn.Clicked += OnApplyClicked;
         ResetMarginsBtn.Clicked += OnResetMarginsClicked;
         ColorPickerTap.Tapped += OnColorPickerTapped;
+
+        // Handle picker changes
+        PageSizePicker.SelectedIndexChanged += OnPageSizeChanged;
+        OrientationPicker.SelectedIndexChanged += OnOrientationChanged;
     }
 
     private void OnBackgroundColorChanged(object? sender, TextChangedEventArgs e)
     {
         UpdateColorPreview(e.NewTextValue);
+    }
+
+    private void OnPageSizeChanged(object? sender, EventArgs e)
+    {
+        // Show current page dimensions
+        if (_project != null && PageSizePicker.SelectedIndex >= 0)
+        {
+            UpdatePageDimensionsDisplay();
+        }
+    }
+
+    private void OnOrientationChanged(object? sender, EventArgs e)
+    {
+        // Show updated page dimensions with new orientation
+        if (_project != null && OrientationPicker.SelectedIndex >= 0)
+        {
+            UpdatePageDimensionsDisplay();
+        }
+    }
+
+    private void UpdatePageDimensionsDisplay()
+    {
+        // This could show a label with current dimensions, but for now we'll just note it
+        // The actual application happens in OnApplyClicked
     }
 
     private void UpdateColorPreview(string? colorHex)
@@ -147,6 +203,19 @@ public partial class ProjectSettingsModal : ContentPage
     {
         if (_project != null)
         {
+            // Update page size and orientation
+            _project.PageSpec.Size = PageSizePicker.SelectedIndex switch
+            {
+                0 => PageSize.FiveBySeven,
+                2 => PageSize.Tabloid_11x17,
+                3 => PageSize.SuperB_13x19,
+                _ => PageSize.Letter
+            };
+
+            _project.PageSpec.Orientation = OrientationPicker.SelectedIndex == 0
+                ? PageOrientation.Portrait
+                : PageOrientation.Landscape;
+
             // Convert inches back to points and update project
             _project.Margins.TopPt = TopMarginSlider.Value * 72.0;
             _project.Margins.BottomPt = BottomMarginSlider.Value * 72.0;
