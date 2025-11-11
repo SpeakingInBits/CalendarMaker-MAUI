@@ -11,7 +11,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
                     <Button Text="Prev" 
                             Command="{Binding NavigatePageCommand}" 
-                            CommandParameter="{x:Int32 -1}"
+                            CommandParameter="-1"
                             Grid.Column="0" />
                     <Label Text="{Binding PageLabel}" 
                            Grid.Column="1" 
@@ -19,7 +19,7 @@
                            HorizontalTextAlignment="Center" />
                     <Button Text="Next" 
                             Command="{Binding NavigatePageCommand}" 
-                            CommandParameter="{x:Int32 1}"
+                            CommandParameter="1"
                             Grid.Column="2" />
                     <!-- Settings Cog Icon -->
                     <Border Grid.Column="3"

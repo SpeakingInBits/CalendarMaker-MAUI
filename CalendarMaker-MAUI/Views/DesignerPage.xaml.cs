@@ -442,8 +442,14 @@ public partial class DesignerPage : ContentPage
             if ((now - _viewModel.LastTapAt).TotalMilliseconds < 300 &&
                 SKPoint.Distance(pagePt, _viewModel.LastTapPoint) < 10)
             {
-                // Execute command using Task.Run to avoid async warning
-                _ = Task.Run(async () => await ((AsyncRelayCommand)_viewModel.ShowPhotoSelectorCommand).ExecuteAsync(null));
+                // Execute command on UI thread
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    if (_viewModel.ShowPhotoSelectorCommand is IAsyncRelayCommand command)
+                    {
+                        await command.ExecuteAsync(null);
+                    }
+                });
             }
 
             _viewModel.LastTapAt = now;

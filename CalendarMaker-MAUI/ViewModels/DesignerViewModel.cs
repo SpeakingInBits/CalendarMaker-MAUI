@@ -162,7 +162,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         _filePickerService = filePickerService;
 
         // Initialize commands
-        NavigatePageCommand = new RelayCommand<int>(NavigatePage);
+        NavigatePageCommand = new RelayCommand<object>(NavigatePage);
         ImportPhotosCommand = new AsyncRelayCommand(ImportPhotosAsync);
         ShowPhotoSelectorCommand = new AsyncRelayCommand(ShowPhotoSelectorAsync);
         ShowProjectSettingsCommand = new AsyncRelayCommand(ShowProjectSettingsAsync);
@@ -280,8 +280,20 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     #region Command Implementations
 
-    private void NavigatePage(int direction)
+    private void NavigatePage(object? parameter)
     {
+        int direction = parameter switch
+        {
+            int i => i,
+            string s when int.TryParse(s, out int parsed) => parsed,
+            _ => 0
+        };
+
+        if (direction == 0)
+        {
+            return;
+        }
+
         PageIndex += direction;
 
         // Determine page range based on double-sided mode
