@@ -21,6 +21,11 @@ public sealed class ImageAsset
     public string Path { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the original file name when the image was imported.
+    /// </summary>
+    public string? OriginalFileName { get; set; }
+
+    /// <summary>
     /// Gets or sets the role of the image in the calendar. Valid values are "monthPhoto" or "coverPhoto".
     /// </summary>
     public string Role { get; set; } = "monthPhoto";

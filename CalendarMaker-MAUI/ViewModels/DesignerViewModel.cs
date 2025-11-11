@@ -162,7 +162,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         _filePickerService = filePickerService;
 
         // Initialize commands
-        NavigatePageCommand = new RelayCommand<int>(NavigatePage);
+        NavigatePageCommand = new RelayCommand<object>(NavigatePage);
         ImportPhotosCommand = new AsyncRelayCommand(ImportPhotosAsync);
         ShowPhotoSelectorCommand = new AsyncRelayCommand(ShowPhotoSelectorAsync);
         ShowProjectSettingsCommand = new AsyncRelayCommand(ShowProjectSettingsAsync);
@@ -280,8 +280,20 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     #region Command Implementations
 
-    private void NavigatePage(int direction)
+    private void NavigatePage(object? parameter)
     {
+        int direction = parameter switch
+        {
+            int i => i,
+            string s when int.TryParse(s, out int parsed) => parsed,
+            _ => 0
+        };
+
+        if (direction == 0)
+        {
+            return;
+        }
+
         PageIndex += direction;
 
         // Determine page range based on double-sided mode
@@ -370,16 +382,63 @@ public sealed partial class DesignerViewModel : ObservableObject
          await _navigationService.PopModalAsync();
      };
 
-        modal.RemoveRequested += async (_, __) =>
-           {
-               if (Project == null)
-               {
-                   return;
-               }
+        modal.UnassignRequested += async (_, __) =>
+        {
+            if (Project == null)
+            {
+                return;
+            }
 
-               await RemovePhotoFromActiveSlotAsync();
-               await _navigationService.PopModalAsync();
-           };
+            await UnassignPhotoFromActiveSlotAsync();
+            SyncZoomUI();
+            OnPropertyChanged(nameof(Project)); // Trigger canvas refresh
+            await _navigationService.PopModalAsync();
+        };
+
+        modal.DeleteRequested += async (_, args) =>
+        {
+            if (Project == null)
+            {
+                return;
+            }
+
+            // Determine which photo to delete
+            string? photoPath = null;
+
+            if (args.SelectedAsset != null)
+            {
+                // Delete the selected photo from the modal
+                photoPath = args.SelectedAsset.Path;
+            }
+            else
+            {
+                // Delete the photo in the active slot
+                var activeAsset = GetActiveAsset();
+                if (activeAsset != null)
+                {
+                    photoPath = activeAsset.Path;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(photoPath))
+            {
+                // Confirm deletion
+                bool confirm = await _dialogService.ShowConfirmAsync(
+                    "Delete Photo",
+                    "This will permanently delete the photo file and remove it from all pages. Continue?",
+                    "Delete",
+                    "Cancel");
+
+                if (confirm)
+                {
+                    await _assets.DeletePhotoFromProjectAsync(Project, photoPath);
+                    SyncZoomUI();
+                    OnPropertyChanged(nameof(Project)); // Trigger canvas refresh
+                }
+            }
+
+            await _navigationService.PopModalAsync();
+        };
 
         modal.Cancelled += async (_, __) =>
         {
@@ -783,7 +842,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         }
     }
 
-    private async Task RemovePhotoFromActiveSlotAsync()
+    private async Task UnassignPhotoFromActiveSlotAsync()
     {
         if (Project == null)
         {
@@ -810,7 +869,7 @@ public sealed partial class DesignerViewModel : ObservableObject
                 await _storage.UpdateProjectAsync(Project);
             }
         }
-        else
+        else // Month pages (including -2 for previous December)
         {
             await _assets.RemovePhotoFromSlotAsync(Project, PageIndex, ActiveSlotIndex, "monthPhoto");
         }

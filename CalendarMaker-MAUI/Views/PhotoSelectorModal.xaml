@@ -18,6 +18,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="CancelBtn" 
@@ -36,9 +37,18 @@
                        HorizontalOptions="Center"
                        VerticalOptions="Center" />
 
-                <Button x:Name="RemoveBtn" 
+                <Button x:Name="UnassignBtn" 
                         Grid.Column="2"
-                        Text="Remove"
+                        Text="Unassign"
+                        BackgroundColor="#FF8800"
+                        TextColor="White"
+                        FontSize="16"
+                        CornerRadius="8"
+                        Margin="0,0,8,0" />
+
+                <Button x:Name="DeleteBtn" 
+                        Grid.Column="3"
+                        Text="Delete Photo"
                         BackgroundColor="#FF4444"
                         TextColor="White"
                         FontSize="16"
