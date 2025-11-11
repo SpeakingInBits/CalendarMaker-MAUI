@@ -8,6 +8,7 @@ public interface IAssetService
     Task<ImageAsset?> ImportProjectPhotoAsync(CalendarProject project, FileResult fileResult);
     Task AssignPhotoToSlotAsync(CalendarProject project, string assetId, int monthIndex, int? slotIndex = null, string role = "monthPhoto");
     Task RemovePhotoFromSlotAsync(CalendarProject project, int monthIndex, int slotIndex, string role = "monthPhoto");
+    Task DeletePhotoFromProjectAsync(CalendarProject project, string photoPath);
     string GetImagesDirectory(string projectId);
     Task<IReadOnlyList<ImageAsset>> GetUnassignedPhotosAsync(CalendarProject project);
     Task<IReadOnlyList<ImageAsset>> GetAllPhotosAsync(CalendarProject project);
@@ -49,6 +50,7 @@ public sealed class AssetService : IAssetService
         {
             ProjectId = project.Id,
             Path = destPath,
+            OriginalFileName = fileResult.FileName, // Store the original filename
             Role = "unassigned",
             MonthIndex = null,
             SlotIndex = null,
@@ -92,6 +94,7 @@ public sealed class AssetService : IAssetService
             Id = Guid.NewGuid().ToString("N"), // New unique ID
             ProjectId = project.Id,
             Path = sourceAsset.Path, // Same file path - reuse the image file
+            OriginalFileName = sourceAsset.OriginalFileName, // Copy the original filename
             Role = role,
             MonthIndex = (role == "coverPhoto" || role == "backCoverPhoto") ? null : monthIndex,
             SlotIndex = slotIndex, // Keep the slot index for ALL roles (including covers!)
@@ -137,5 +140,38 @@ public sealed class AssetService : IAssetService
     {
         // Return ALL assets - the modal will handle grouping and deduplication
         return await Task.FromResult(project.ImageAssets.ToList());
+    }
+
+    public async Task DeletePhotoFromProjectAsync(CalendarProject project, string photoPath)
+    {
+        if (project == null || string.IsNullOrWhiteSpace(photoPath))
+        {
+            return;
+        }
+
+        // Remove all asset instances that reference this photo path
+        var assetsToRemove = project.ImageAssets
+            .Where(a => a.Path == photoPath)
+            .ToList();
+
+        foreach (var asset in assetsToRemove)
+        {
+            project.ImageAssets.Remove(asset);
+        }
+
+        // Delete the physical file if it exists
+        if (File.Exists(photoPath))
+        {
+            try
+            {
+                File.Delete(photoPath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AssetService: Error deleting file {photoPath} - {ex.Message}");
+            }
+        }
+
+        await _storage.UpdateProjectAsync(project);
     }
 }

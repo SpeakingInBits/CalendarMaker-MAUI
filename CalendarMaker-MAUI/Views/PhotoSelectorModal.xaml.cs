@@ -10,7 +10,8 @@ public partial class PhotoSelectorModal : ContentPage
     private PhotoItem? _selectedPhoto;
 
     public event EventHandler<PhotoSelectedEventArgs>? PhotoSelected;
-    public event EventHandler? RemoveRequested;
+    public event EventHandler? UnassignRequested;
+    public event EventHandler<PhotoDeleteRequestedEventArgs>? DeleteRequested;
     public event EventHandler? Cancelled;
 
     public PhotoSelectorModal(IEnumerable<ImageAsset> allPhotos, string slotDescription)
@@ -27,7 +28,8 @@ public partial class PhotoSelectorModal : ContentPage
 
         // Wire up events
         CancelBtn.Clicked += OnCancelClicked;
-        RemoveBtn.Clicked += OnRemoveClicked;
+        UnassignBtn.Clicked += OnUnassignClicked;
+        DeleteBtn.Clicked += OnDeleteClicked;
         AssignBtn.Clicked += OnAssignClicked;
 
         // Load photos
@@ -52,11 +54,16 @@ public partial class PhotoSelectorModal : ContentPage
                 bool hasUnassigned = group.Any(a => a.Role == "unassigned");
                 bool isInUse = group.Any(a => a.Role != "unassigned");
 
+                // Use OriginalFileName if available, otherwise fall back to file path filename
+                string displayFileName = !string.IsNullOrWhiteSpace(representative.OriginalFileName)
+                    ? representative.OriginalFileName
+                    : System.IO.Path.GetFileName(representative.Path);
+
                 return new PhotoItem
                 {
                     Asset = representative,
                     Path = representative.Path,
-                    FileName = System.IO.Path.GetFileName(representative.Path),
+                    FileName = displayFileName,
                     IsUnassigned = hasUnassigned,
                     IsInUse = isInUse,
                     IsSelected = false
@@ -119,9 +126,21 @@ public partial class PhotoSelectorModal : ContentPage
         }
     }
 
-    private void OnRemoveClicked(object? sender, EventArgs e)
+    private void OnUnassignClicked(object? sender, EventArgs e)
     {
-        RemoveRequested?.Invoke(this, EventArgs.Empty);
+        UnassignRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnDeleteClicked(object? sender, EventArgs e)
+    {
+        if (_selectedPhoto?.Asset != null)
+        {
+            DeleteRequested?.Invoke(this, new PhotoDeleteRequestedEventArgs(_selectedPhoto.Asset));
+        }
+        else
+        {
+            DeleteRequested?.Invoke(this, new PhotoDeleteRequestedEventArgs(null));
+        }
     }
 
     private void OnCancelClicked(object? sender, EventArgs e)
@@ -166,6 +185,16 @@ public class PhotoSelectedEventArgs : EventArgs
     public ImageAsset SelectedAsset { get; }
 
     public PhotoSelectedEventArgs(ImageAsset selectedAsset)
+    {
+        SelectedAsset = selectedAsset;
+    }
+}
+
+public class PhotoDeleteRequestedEventArgs : EventArgs
+{
+    public ImageAsset? SelectedAsset { get; }
+
+    public PhotoDeleteRequestedEventArgs(ImageAsset? selectedAsset)
     {
         SelectedAsset = selectedAsset;
     }
