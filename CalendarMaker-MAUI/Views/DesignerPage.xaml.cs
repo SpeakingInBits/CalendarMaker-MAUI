@@ -227,7 +227,7 @@ public partial class DesignerPage : ContentPage
         }
         else if (pageIndex == -2) // Previous December
         {
-            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec, project.PageSpec);
 
             int decemberIndex = project.StartMonth == 1 ? 11 : 12 - project.StartMonth;
             PhotoLayout layout = project.MonthPhotoLayouts.TryGetValue(decemberIndex, out PhotoLayout perMonth)
@@ -268,7 +268,7 @@ public partial class DesignerPage : ContentPage
         }
         else // Month page
         {
-            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec, project.PageSpec);
 
             PhotoLayout layout = project.MonthPhotoLayouts.TryGetValue(pageIndex, out PhotoLayout perMonth)
                 ? perMonth

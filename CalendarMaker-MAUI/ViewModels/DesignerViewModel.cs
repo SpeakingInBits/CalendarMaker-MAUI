@@ -262,15 +262,23 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             return Project.FrontCoverPhotoLayout;
         }
+        else if (PageIndex == -2) // Previous December
+        {
+            // Calculate the December index the same way rendering does
+            int decemberIndex = Project.StartMonth == 1 ? 11 : 12 - Project.StartMonth;
+            return Project.MonthPhotoLayouts.TryGetValue(decemberIndex, out var layout)
+                ? layout
+                : Project.LayoutSpec.PhotoLayout;
+        }
         else if (PageIndex == 12)
         {
             return Project.BackCoverPhotoLayout;
         }
-        else if (PageIndex >= -2 && PageIndex <= 11)
+        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
         {
             return Project.MonthPhotoLayouts.TryGetValue(PageIndex, out var layout)
-                        ? layout
-                 : Project.LayoutSpec.PhotoLayout;
+                ? layout
+                : Project.LayoutSpec.PhotoLayout;
         }
 
         return PhotoLayout.Single;
@@ -378,7 +386,8 @@ public sealed partial class DesignerViewModel : ObservableObject
          }
 
          await _assets.AssignPhotoToSlotAsync(Project, selected.Id, monthIndex ?? 0, slotIndex, role);
-         SyncZoomUI();
+         SyncZoomUI(); // Sync zoom UI to reflect the new photo's zoom (which should be 1.0)
+         OnPropertyChanged(nameof(Project)); // Trigger canvas refresh to show the new photo
          await _navigationService.PopModalAsync();
      };
 
@@ -459,6 +468,12 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         modal.Applied += async (_, __) =>
         {
+            if (Project != null)
+            {
+                // Update the timestamp to ensure changes are tracked
+                Project.UpdatedUtc = DateTime.UtcNow;
+            }
+
             // Save the updated project
             await _storage.UpdateProjectAsync(Project);
             await _navigationService.PopModalAsync();
@@ -493,6 +508,9 @@ public sealed partial class DesignerViewModel : ObservableObject
         };
 
         _ = _storage.UpdateProjectAsync(Project);
+        
+        // Trigger canvas refresh to show the flipped layout
+        OnPropertyChanged(nameof(Project));
     }
 
     private async Task ExportCurrentPageAsync()
@@ -674,11 +692,17 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             Project.FrontCoverPhotoLayout = layout;
         }
+        else if (PageIndex == -2) // Previous December
+        {
+            // Calculate the December index the same way rendering does
+            int decemberIndex = Project.StartMonth == 1 ? 11 : 12 - Project.StartMonth;
+            Project.MonthPhotoLayouts[decemberIndex] = layout;
+        }
         else if (PageIndex == 12)
         {
             Project.BackCoverPhotoLayout = layout;
         }
-        else if (PageIndex >= -2 && PageIndex <= 11)
+        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
         {
             Project.MonthPhotoLayouts[PageIndex] = layout;
         }
@@ -743,6 +767,13 @@ public sealed partial class DesignerViewModel : ObservableObject
      UpdatePageLabel();
             _ = _storage.UpdateProjectAsync(Project);
         }
+    }
+
+    partial void OnActiveSlotIndexChanged(int value)
+    {
+        // Sync the zoom UI when the active slot changes
+        // This ensures the zoom slider reflects the zoom level of the newly selected photo
+        SyncZoomUI();
     }
 
     #endregion
@@ -810,6 +841,11 @@ public sealed partial class DesignerViewModel : ObservableObject
         if (asset != null)
         {
             ZoomValue = Math.Clamp(asset.Zoom, 0.5, 3.0);
+        }
+        else
+        {
+            // Reset to default zoom when no asset is present
+            ZoomValue = 1.0;
         }
     }
 
