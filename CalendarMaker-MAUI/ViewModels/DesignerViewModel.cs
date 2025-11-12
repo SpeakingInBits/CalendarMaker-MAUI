@@ -378,7 +378,8 @@ public sealed partial class DesignerViewModel : ObservableObject
          }
 
          await _assets.AssignPhotoToSlotAsync(Project, selected.Id, monthIndex ?? 0, slotIndex, role);
-         SyncZoomUI();
+         SyncZoomUI(); // Sync zoom UI to reflect the new photo's zoom (which should be 1.0)
+         OnPropertyChanged(nameof(Project)); // Trigger canvas refresh to show the new photo
          await _navigationService.PopModalAsync();
      };
 
@@ -745,6 +746,13 @@ public sealed partial class DesignerViewModel : ObservableObject
         }
     }
 
+    partial void OnActiveSlotIndexChanged(int value)
+    {
+        // Sync the zoom UI when the active slot changes
+        // This ensures the zoom slider reflects the zoom level of the newly selected photo
+        SyncZoomUI();
+    }
+
     #endregion
 
     #region Private Helper Methods
@@ -810,6 +818,11 @@ public sealed partial class DesignerViewModel : ObservableObject
         if (asset != null)
         {
             ZoomValue = Math.Clamp(asset.Zoom, 0.5, 3.0);
+        }
+        else
+        {
+            // Reset to default zoom when no asset is present
+            ZoomValue = 1.0;
         }
     }
 
