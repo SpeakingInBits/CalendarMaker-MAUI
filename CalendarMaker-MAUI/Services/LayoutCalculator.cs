@@ -27,11 +27,38 @@ public sealed class LayoutCalculator : ILayoutCalculator
     }
 
     /// <inheritdoc />
-    public (SKRect photoRect, SKRect calendarRect) ComputeSplit(SKRect area, LayoutSpec spec)
+    public (SKRect photoRect, SKRect calendarRect) ComputeSplit(SKRect area, LayoutSpec spec, PageSpec pageSpec)
     {
         float ratio = (float)Math.Clamp(spec.SplitRatio, 0.1, 0.9);
 
-        return spec.Placement switch
+        // Determine the effective placement based on orientation
+        LayoutPlacement effectivePlacement = spec.Placement;
+
+        // Auto-adjust placement based on orientation
+        if (pageSpec.Orientation == PageOrientation.Landscape)
+        {
+            // In landscape, convert vertical placements to horizontal
+            effectivePlacement = spec.Placement switch
+            {
+                LayoutPlacement.PhotoTopCalendarBottom => LayoutPlacement.PhotoLeftCalendarRight,
+                LayoutPlacement.PhotoBottomCalendarTop => LayoutPlacement.PhotoRightCalendarLeft,
+                // Keep horizontal placements as-is
+                _ => spec.Placement
+            };
+        }
+        else // Portrait
+        {
+            // In portrait, convert horizontal placements to vertical
+            effectivePlacement = spec.Placement switch
+            {
+                LayoutPlacement.PhotoLeftCalendarRight => LayoutPlacement.PhotoTopCalendarBottom,
+                LayoutPlacement.PhotoRightCalendarLeft => LayoutPlacement.PhotoBottomCalendarTop,
+                // Keep vertical placements as-is
+                _ => spec.Placement
+            };
+        }
+
+        return effectivePlacement switch
         {
             LayoutPlacement.PhotoLeftCalendarRight => (
              new SKRect(area.Left, area.Top, area.Left + area.Width * ratio, area.Bottom),

@@ -468,6 +468,12 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         modal.Applied += async (_, __) =>
         {
+            if (Project != null)
+            {
+                // Update the timestamp to ensure changes are tracked
+                Project.UpdatedUtc = DateTime.UtcNow;
+            }
+
             // Save the updated project
             await _storage.UpdateProjectAsync(Project);
             await _navigationService.PopModalAsync();

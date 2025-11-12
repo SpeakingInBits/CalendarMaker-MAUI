@@ -301,7 +301,7 @@ public sealed class PdfExportService : IPdfExportService
         else
         {
             // Regular page: photo on one side, calendar on the other
-            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec, project.PageSpec);
 
             // Get photo layout for the photo month
             var photoLayout = project.MonthPhotoLayouts.TryGetValue(pageSpec.PhotoMonthIndex, out var perMonth)
@@ -586,7 +586,7 @@ public sealed class PdfExportService : IPdfExportService
         }
         else
         {
-            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec);
+            (SKRect photoRect, SKRect calRect) = _layoutCalculator.ComputeSplit(contentRect, project.LayoutSpec, project.PageSpec);
             var layout = project.MonthPhotoLayouts.TryGetValue(monthIndex, out var perMonth)
                 ? perMonth
                 : project.LayoutSpec.PhotoLayout;
