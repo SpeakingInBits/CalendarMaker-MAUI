@@ -262,15 +262,23 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             return Project.FrontCoverPhotoLayout;
         }
+        else if (PageIndex == -2) // Previous December
+        {
+            // Calculate the December index the same way rendering does
+            int decemberIndex = Project.StartMonth == 1 ? 11 : 12 - Project.StartMonth;
+            return Project.MonthPhotoLayouts.TryGetValue(decemberIndex, out var layout)
+                ? layout
+                : Project.LayoutSpec.PhotoLayout;
+        }
         else if (PageIndex == 12)
         {
             return Project.BackCoverPhotoLayout;
         }
-        else if (PageIndex >= -2 && PageIndex <= 11)
+        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
         {
             return Project.MonthPhotoLayouts.TryGetValue(PageIndex, out var layout)
-                        ? layout
-                 : Project.LayoutSpec.PhotoLayout;
+                ? layout
+                : Project.LayoutSpec.PhotoLayout;
         }
 
         return PhotoLayout.Single;
@@ -675,11 +683,17 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             Project.FrontCoverPhotoLayout = layout;
         }
+        else if (PageIndex == -2) // Previous December
+        {
+            // Calculate the December index the same way rendering does
+            int decemberIndex = Project.StartMonth == 1 ? 11 : 12 - Project.StartMonth;
+            Project.MonthPhotoLayouts[decemberIndex] = layout;
+        }
         else if (PageIndex == 12)
         {
             Project.BackCoverPhotoLayout = layout;
         }
-        else if (PageIndex >= -2 && PageIndex <= 11)
+        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
         {
             Project.MonthPhotoLayouts[PageIndex] = layout;
         }
