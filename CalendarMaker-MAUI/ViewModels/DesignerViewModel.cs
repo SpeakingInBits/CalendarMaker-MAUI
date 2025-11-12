@@ -508,6 +508,9 @@ public sealed partial class DesignerViewModel : ObservableObject
         };
 
         _ = _storage.UpdateProjectAsync(Project);
+        
+        // Trigger canvas refresh to show the flipped layout
+        OnPropertyChanged(nameof(Project));
     }
 
     private async Task ExportCurrentPageAsync()
