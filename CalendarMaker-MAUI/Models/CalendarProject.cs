@@ -106,6 +106,7 @@ public sealed class CalendarProject
         PageSize.Letter => "Letter",
         PageSize.Tabloid_11x17 => "11x17",
         PageSize.SuperB_13x19 => "13x19",
+        PageSize.Square_12x12 => "12x12",
         _ => PageSpec.Size.ToString()
     };
 }

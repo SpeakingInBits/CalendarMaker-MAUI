@@ -14,6 +14,7 @@
                     <x:String>Letter Portrait</x:String>
                     <x:String>11x17 Portrait</x:String>
                     <x:String>13x19 Portrait</x:String>
+                    <x:String>12x12 Square</x:String>
                 </Picker.Items>
             </Picker>
         </VerticalStackLayout>

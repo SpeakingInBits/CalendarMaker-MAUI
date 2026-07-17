@@ -20,7 +20,8 @@ public partial class ProjectSettingsModal : ContentPage
             "5×7 inches",
             "Letter (8.5×11 inches)",
             "Tabloid/Ledger (11×17 inches)",
-            "Super B (13×19 inches)"
+            "Super B (13×19 inches)",
+            "12x12 inches (square)"
         };
 
         // Set current page size
@@ -30,6 +31,7 @@ public partial class ProjectSettingsModal : ContentPage
             PageSize.Letter => 1,
             PageSize.Tabloid_11x17 => 2,
             PageSize.SuperB_13x19 => 3,
+            PageSize.Square_12x12 => 4,
             _ => 1 // Default to Letter
         };
 
@@ -209,6 +211,7 @@ public partial class ProjectSettingsModal : ContentPage
                 0 => PageSize.FiveBySeven,
                 2 => PageSize.Tabloid_11x17,
                 3 => PageSize.SuperB_13x19,
+                4 => PageSize.Square_12x12,
                 _ => PageSize.Letter
             };
 
