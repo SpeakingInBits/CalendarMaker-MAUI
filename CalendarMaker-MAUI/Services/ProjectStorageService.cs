@@ -17,8 +17,18 @@ public sealed class ProjectStorageService : IProjectStorageService
     private readonly string _root;
 
     public ProjectStorageService()
+        : this(Path.Combine(FileSystem.Current.AppDataDirectory, "Projects"))
     {
-        _root = Path.Combine(FileSystem.Current.AppDataDirectory, "Projects");
+    }
+
+    /// <summary>
+    /// Creates a storage service rooted at an explicit directory. Primarily a testability seam;
+    /// the parameterless constructor uses the platform app-data directory.
+    /// </summary>
+    /// <param name="rootDirectory">The directory under which project folders are stored.</param>
+    public ProjectStorageService(string rootDirectory)
+    {
+        _root = rootDirectory;
         Directory.CreateDirectory(_root);
     }
 

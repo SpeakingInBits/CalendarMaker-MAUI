@@ -19,6 +19,7 @@ public static class PageSizes
             PageSize.Letter => (8.5, 11.0),
             PageSize.Tabloid_11x17 => (11.0, 17.0),
             PageSize.SuperB_13x19 => (13.0, 19.0),
+            PageSize.Square_12x12 => (12.0, 12.0),
             PageSize.Custom => (0, 0),
             _ => (8.5, 11.0)
         };

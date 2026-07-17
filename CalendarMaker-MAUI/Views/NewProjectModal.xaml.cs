@@ -32,6 +32,7 @@ public partial class NewProjectModal : ContentPage
             1 => "Letter Portrait 50/50 (Photo Top)",
             2 => "11x17 Portrait 60/40 (Photo Top)",
             3 => "13x19 Portrait 65/35 (Photo Top)",
+            4 => "12x12 Square 50/50 (Photo Top)",
             _ => "5x7 Landscape 50/50 (Photo Left)"
         };
 
