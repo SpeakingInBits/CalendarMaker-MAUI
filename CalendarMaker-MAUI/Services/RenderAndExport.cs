@@ -738,6 +738,7 @@ public sealed class PdfExportService : IPdfExportService
         {
        string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
         canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+        CalendarEventDrawing.DrawDayEvents(canvas, cell, project, date.Value);
         }
          }
         }
@@ -873,6 +874,7 @@ TextSize = 18,
         {
      string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
         canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
+        CalendarEventDrawing.DrawDayEvents(canvas, cell, project, date.Value);
         }
       }
      }

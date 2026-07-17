@@ -20,7 +20,7 @@ public sealed class CalendarRenderer : ICalendarRenderer
     }
 
     /// <inheritdoc />
-    public void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month)
+    public void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, IDictionary<DateTime, SKRect>? dayCellBounds = null)
     {
         var weeks = _calendarEngine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
@@ -48,13 +48,13 @@ public sealed class CalendarRenderer : ICalendarRenderer
 
         // Render day grid
         var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
-        RenderDayGrid(canvas, weeksArea, weeks, month, project);
+        RenderDayGrid(canvas, weeksArea, weeks, month, project, dayCellBounds);
     }
 
     /// <summary>
     /// Renders the calendar grid with an optional background color.
     /// </summary>
-    public void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, bool applyBackground)
+    public void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, bool applyBackground, IDictionary<DateTime, SKRect>? dayCellBounds = null)
     {
       SKRect calendarRect = bounds;
    
@@ -86,7 +86,7 @@ Style = SKPaintStyle.Fill
  
    // Draw white/transparent rectangle over the calendar grid area (EXCEPT the header)
    // to "cut out" the background, leaving the header in the colored area
-     RenderCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month);
+     RenderCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month, dayCellBounds);
             return;
     }
       }
@@ -102,7 +102,7 @@ Style = SKPaintStyle.Fill
      }
 
       // Render the standard calendar grid
-  RenderCalendarGrid(canvas, calendarRect, project, year, month);
+  RenderCalendarGrid(canvas, calendarRect, project, year, month, dayCellBounds);
     }
 
     /// <inheritdoc />
@@ -253,7 +253,7 @@ Style = SKPaintStyle.Fill
         }
     }
 
-    private void RenderDayGrid(SKCanvas canvas, SKRect bounds, List<List<DateTime?>> weeks, int month, CalendarProject project)
+    private void RenderDayGrid(SKCanvas canvas, SKRect bounds, List<List<DateTime?>> weeks, int month, CalendarProject project, IDictionary<DateTime, SKRect>? dayCellBounds = null)
     {
         if (weeks.Count == 0)
         {
@@ -294,6 +294,12 @@ Style = SKPaintStyle.Fill
                 {
                     string dayText = date.Value.Day.ToString(CultureInfo.InvariantCulture);
                     canvas.DrawText(dayText, cellRect.Left + 2, cellRect.Top + textPaint.TextSize + 2, textPaint);
+
+                    CalendarEventDrawing.DrawDayEvents(canvas, cellRect, project, date.Value);
+                    if (dayCellBounds != null)
+                    {
+                        dayCellBounds[date.Value.Date] = cellRect;
+                    }
                 }
             }
         }
@@ -331,7 +337,7 @@ Style = SKPaintStyle.Fill
         }
     }
 
-    private void RenderCalendarGridWithHeaderInPadding(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month)
+    private void RenderCalendarGridWithHeaderInPadding(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, IDictionary<DateTime, SKRect>? dayCellBounds = null)
     {
         var weeks = _calendarEngine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
 
@@ -370,7 +376,7 @@ Style = SKPaintStyle.Fill
 
         // Render day grid
    var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, bounds.Bottom);
-   RenderDayGrid(canvas, weeksArea, weeks, month, project);
+   RenderDayGrid(canvas, weeksArea, weeks, month, project, dayCellBounds);
     }
 
   private SKColor GetContrastingTextColor(string? backgroundColor)
