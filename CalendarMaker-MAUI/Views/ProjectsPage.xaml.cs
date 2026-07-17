@@ -87,6 +87,13 @@ public partial class ProjectsPage : ContentPage
             project.LayoutSpec.Placement = LayoutPlacement.PhotoTopCalendarBottom;
             project.LayoutSpec.SplitRatio = 0.65;
         }
+        else if (preset.StartsWith("12x12"))
+        {
+            project.PageSpec.Size = PageSize.Square_12x12;
+            project.PageSpec.Orientation = PageOrientation.Portrait;
+            project.LayoutSpec.Placement = LayoutPlacement.PhotoTopCalendarBottom;
+            project.LayoutSpec.SplitRatio = 0.5;
+        }
         else
         {
             project.PageSpec.Size = PageSize.Letter;

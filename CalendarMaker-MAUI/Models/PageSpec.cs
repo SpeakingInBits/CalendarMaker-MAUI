@@ -33,7 +33,16 @@ public enum PageSize
     /// <summary>
     /// Custom page size with user-defined dimensions.
     /// </summary>
-    Custom
+    Custom,
+
+    /// <summary>
+    /// 12x12 inch square page size (classic wall/scrapbook calendar).
+    /// </summary>
+    /// <remarks>
+    /// Declared last so its serialized integer value stays stable and does not
+    /// shift the values of the pre-existing members in saved projects.
+    /// </remarks>
+    Square_12x12
 }
 
 /// <summary>
