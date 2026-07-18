@@ -90,6 +90,8 @@ public class CalendarRendererDayCellsTests
     [InlineData("A really long multi word event title that must wrap onto several lines")]
     [InlineData("Supercalifragilisticexpialidociousunbreakablesingleword")] // no spaces -> hard break
     [InlineData("")] // empty title
+    [InlineData("Mom's Birthday 🎂 party 🎉")] // emoji in title (font fallback path)
+    [InlineData("🏈🎂🎉⭐❤️🎄")] // emoji-only title
     public void RenderCalendarGrid_WithLongOrAwkwardTitle_WrapsWithoutThrowing(string title)
     {
         var renderer = CreateRenderer();
