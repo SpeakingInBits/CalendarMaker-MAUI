@@ -182,13 +182,14 @@ CalendarMaker-MAUI/
    - Choose export location
    - PDFs are generated at 300 DPI for professional printing
 
+## Screenshots
+[![Calendar Month View](docs/screenshots/CalendarMonthView.png)](docs/screenshots/CalendarMonthView.png)
+
 ## Roadmap
 
 Future enhancements planned:
 
-- Event management (single and recurring events)
 - US federal holidays overlay
-- Additional photo layouts and collages
 - Drag-and-drop photo import
 - Project import/export as ZIP
 - Custom fonts per project
