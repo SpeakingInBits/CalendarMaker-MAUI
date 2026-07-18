@@ -70,8 +70,7 @@ public class CalendarRendererDayCellsTests
         var project = new CalendarProject { FirstDayOfWeek = DayOfWeek.Sunday };
         project.Events.Add(new CalendarEvent
         {
-            Title = "Holiday",
-            Emoji = "🎉",
+            Title = "Holiday 🎉",
             ColorHex = "#59A14F",
             Recurrence = EventRecurrence.Annually,
             Month = 1,

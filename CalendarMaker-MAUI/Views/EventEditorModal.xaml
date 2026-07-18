@@ -24,13 +24,7 @@
                 <Label Text="Add an event" FontAttributes="Bold" />
 
                 <Label Text="Title" />
-                <Entry x:Name="TitleEntry" Placeholder="e.g. Mom's Birthday" />
-
-                <Label Text="Emoji (optional)" />
-                <HorizontalStackLayout Spacing="8">
-                    <Entry x:Name="EmojiEntry" Placeholder="🎂" WidthRequest="70" MaxLength="4" />
-                    <HorizontalStackLayout x:Name="EmojiQuickPicks" Spacing="4" />
-                </HorizontalStackLayout>
+                <Entry x:Name="TitleEntry" Placeholder="e.g. Mom's Birthday 🎂" />
 
                 <Label Text="Color" />
                 <HorizontalStackLayout x:Name="ColorSwatches" Spacing="6" />

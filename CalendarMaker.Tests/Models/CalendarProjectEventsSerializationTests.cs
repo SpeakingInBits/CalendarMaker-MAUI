@@ -17,8 +17,7 @@ public class CalendarProjectEventsSerializationTests
         project.Events.Add(new CalendarEvent
         {
             Id = "e1",
-            Title = "Mom's Birthday",
-            Emoji = "🎂",
+            Title = "Mom's Birthday 🎂",
             ColorHex = "#E15759",
             Recurrence = EventRecurrence.Annually,
             Month = 4,
@@ -27,8 +26,7 @@ public class CalendarProjectEventsSerializationTests
         project.Events.Add(new CalendarEvent
         {
             Id = "e2",
-            Title = "Thanksgiving",
-            Emoji = "🦃",
+            Title = "Thanksgiving 🦃",
             ColorHex = "#F28E2B",
             Recurrence = EventRecurrence.MonthlyByWeekday,
             Month = 11,

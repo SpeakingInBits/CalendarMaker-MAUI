@@ -61,10 +61,9 @@ public class CalendarEventServiceTests
     {
         var date = new DateTime(2025, 10, 16); // a Thursday, 3rd of the month
 
-        var ev = CalendarEventService.CreateForDate(date, "Book club", "📚", "#59A14F", EventRecurrence.MonthlyByWeekday);
+        var ev = CalendarEventService.CreateForDate(date, "Book club", "#59A14F", EventRecurrence.MonthlyByWeekday);
 
         ev.Title.Should().Be("Book club");
-        ev.Emoji.Should().Be("📚");
         ev.ColorHex.Should().Be("#59A14F");
         ev.Recurrence.Should().Be(EventRecurrence.MonthlyByWeekday);
         ev.Year.Should().Be(2025);
@@ -75,14 +74,6 @@ public class CalendarEventServiceTests
 
         // The created event should resolve to its own anchor date.
         ev.OccursOn(date).Should().BeTrue();
-    }
-
-    [Fact]
-    public void CreateForDate_BlankEmoji_StoredAsNull()
-    {
-        var ev = CalendarEventService.CreateForDate(new DateTime(2025, 1, 1), "New Year", "   ", "#4E79A7", EventRecurrence.Annually);
-
-        ev.Emoji.Should().BeNull();
     }
 
     [Fact]

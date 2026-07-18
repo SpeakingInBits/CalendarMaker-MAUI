@@ -44,11 +44,6 @@ public sealed class CalendarEvent
     public string Title { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets an optional emoji or short symbol used to draw attention to the event.
-    /// </summary>
-    public string? Emoji { get; set; }
-
-    /// <summary>
     /// Gets or sets the accent color of the event as a hex string (e.g. "#4E79A7").
     /// </summary>
     public string ColorHex { get; set; } = "#4E79A7";

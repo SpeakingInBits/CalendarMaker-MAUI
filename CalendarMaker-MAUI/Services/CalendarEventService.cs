@@ -51,14 +51,12 @@ public static class CalendarEventService
     public static CalendarEvent CreateForDate(
         DateTime date,
         string title,
-        string? emoji,
         string colorHex,
         EventRecurrence recurrence)
     {
         return new CalendarEvent
         {
             Title = title,
-            Emoji = string.IsNullOrWhiteSpace(emoji) ? null : emoji,
             ColorHex = colorHex,
             Recurrence = recurrence,
             Year = date.Year,

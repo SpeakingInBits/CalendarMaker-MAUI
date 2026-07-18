@@ -58,8 +58,7 @@ internal static class CalendarEventDrawing
             float radius = chipHeight / 3f;
             canvas.DrawRoundRect(chipRect, radius, radius, chipPaint);
 
-            string label = string.IsNullOrWhiteSpace(ev.Emoji) ? ev.Title : $"{ev.Emoji} {ev.Title}";
-            label = label.Trim();
+            string label = ev.Title.Trim();
             if (!string.IsNullOrEmpty(label))
             {
                 textPaint.Color = ContrastingTextColor(color);

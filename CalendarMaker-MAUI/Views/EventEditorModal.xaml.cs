@@ -31,31 +31,12 @@ public partial class EventEditorModal : ContentPage
 
         HeaderLabel.Text = $"Events — {_date.ToString("dddd, MMMM d, yyyy", CultureInfo.InvariantCulture)}";
 
-        BuildEmojiQuickPicks();
         BuildColorSwatches();
         BuildRecurrenceOptions();
         RefreshExistingEvents();
 
         AddButton.Clicked += OnAddClicked;
         CloseButton.Clicked += (_, __) => Closed?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void BuildEmojiQuickPicks()
-    {
-        foreach (string emoji in new[] { "🎂", "🎉", "🏈", "⭐", "❤️", "🎄" })
-        {
-            var btn = new Button
-            {
-                Text = emoji,
-                FontSize = 16,
-                Padding = 0,
-                WidthRequest = 40,
-                HeightRequest = 40,
-                BackgroundColor = Colors.Transparent
-            };
-            btn.Clicked += (_, __) => EmojiEntry.Text = emoji;
-            EmojiQuickPicks.Children.Add(btn);
-        }
     }
 
     private void BuildColorSwatches()
@@ -123,7 +104,6 @@ public partial class EventEditorModal : ContentPage
         var newEvent = CalendarEventService.CreateForDate(
             _date,
             title,
-            EmojiEntry.Text,
             _selectedColor,
             GetSelectedRecurrence());
 
@@ -132,7 +112,6 @@ public partial class EventEditorModal : ContentPage
 
         // Reset the form for the next entry.
         TitleEntry.Text = string.Empty;
-        EmojiEntry.Text = string.Empty;
         RefreshExistingEvents();
     }
 
@@ -160,10 +139,9 @@ public partial class EventEditorModal : ContentPage
             VerticalOptions = LayoutOptions.Center
         };
 
-        string prefix = string.IsNullOrWhiteSpace(ev.Emoji) ? string.Empty : ev.Emoji + " ";
         var label = new Label
         {
-            Text = prefix + ev.Title,
+            Text = ev.Title,
             VerticalOptions = LayoutOptions.Center
         };
 
