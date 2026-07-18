@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="CalendarMaker_MAUI.Views.EventEditorModal"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Events">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+            <Label x:Name="HeaderLabel" FontAttributes="Bold" FontSize="20" />
+
+            <!-- Existing events for this day -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Events on this day" FontAttributes="Bold" />
+                <VerticalStackLayout x:Name="ExistingEventsContainer" Spacing="6" />
+                <Label x:Name="NoEventsLabel"
+                       Text="No events yet. Add one below."
+                       FontSize="13"
+                       TextColor="Gray" />
+            </VerticalStackLayout>
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <!-- Add a new event -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Add an event" FontAttributes="Bold" />
+
+                <Label Text="Title" />
+                <Entry x:Name="TitleEntry" Placeholder="e.g. Mom's Birthday 🎂" />
+
+                <Label Text="Color" />
+                <HorizontalStackLayout x:Name="ColorSwatches" Spacing="6" />
+
+                <Label Text="Repeats" />
+                <Picker x:Name="RecurrencePicker" />
+
+                <Button x:Name="AddButton" Text="Add event" />
+            </VerticalStackLayout>
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <Button x:Name="CloseButton" Text="Done" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -17,7 +17,9 @@ public interface ICalendarRenderer
     /// <param name="project">The calendar project containing theme and settings.</param>
     /// <param name="year">The year to render.</param>
     /// <param name="month">The month to render (1-12).</param>
-    void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month);
+    /// <param name="dayCellBounds">Optional map that, when supplied, is populated with the on-canvas
+    /// rectangle of each in-month day cell (keyed by date) for hit-testing.</param>
+    void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, IDictionary<DateTime, SKRect>? dayCellBounds = null);
 
     /// <summary>
     /// Renders a complete calendar page including photos and calendar grid with optional background.
@@ -28,7 +30,9 @@ public interface ICalendarRenderer
     /// <param name="year">The year to render.</param>
     /// <param name="month">The month to render (1-12).</param>
     /// <param name="applyBackground">Whether to apply the theme's background color.</param>
-    void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, bool applyBackground);
+    /// <param name="dayCellBounds">Optional map that, when supplied, is populated with the on-canvas
+    /// rectangle of each in-month day cell (keyed by date) for hit-testing.</param>
+    void RenderCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month, bool applyBackground, IDictionary<DateTime, SKRect>? dayCellBounds = null);
 
     /// <summary>
     /// Renders photos in their designated slots with pan/zoom applied.

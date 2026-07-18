@@ -209,6 +209,9 @@ public partial class DesignerPage : ContentPage
         List<SKRect> photoSlots;
         SKRect photoRect;
 
+        // Day-cell rects are only meaningful on pages that draw a calendar grid; clear stale ones.
+        _viewModel.LastDayCells.Clear();
+
         if (pageIndex == -1) // Front cover
         {
             PhotoLayout layout = project.FrontCoverPhotoLayout;
@@ -246,9 +249,9 @@ public partial class DesignerPage : ContentPage
                 activeSlotIndex);
 
             // Draw calendar for previous year with background if borderless
-            bool applyCalendarBackground = IsMonthPageBorderless(project) && 
+            bool applyCalendarBackground = IsMonthPageBorderless(project) &&
      project.CoverSpec.UseCalendarBackgroundOnBorderless;
-       _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12, applyCalendarBackground);
+       _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12, applyCalendarBackground, _viewModel.LastDayCells);
         }
         else if (pageIndex == 12) // Back cover
         {
@@ -291,7 +294,7 @@ public partial class DesignerPage : ContentPage
             // Apply background to calendar area if this is a borderless month page
             bool applyCalendarBackground = IsMonthPageBorderless(project) &&
                                           project.CoverSpec.UseCalendarBackgroundOnBorderless;
-            _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, year, month, applyCalendarBackground);
+            _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, year, month, applyCalendarBackground, _viewModel.LastDayCells);
         }
     }
 
@@ -328,6 +331,18 @@ public partial class DesignerPage : ContentPage
         int pageIndex = _viewModel.PageIndex;
         bool isCover = pageIndex == -1 || pageIndex == 12;
         SKRect hitRect = isCover ? _viewModel.LastContentRect : _viewModel.LastPhotoRect;
+
+        // Right-click a calendar day to add/edit events (desktop). Double-click works everywhere.
+        if (e.ActionType == SKTouchAction.Pressed && e.MouseButton == SKMouseButton.Right)
+        {
+            DateTime? rightClickedDay = HitTestDayCell(pagePt);
+            if (rightClickedDay.HasValue)
+            {
+                OpenEventEditor(rightClickedDay.Value);
+                e.Handled = true;
+                return;
+            }
+        }
 
         switch (e.ActionType)
         {
@@ -435,12 +450,28 @@ public partial class DesignerPage : ContentPage
             return;
         }
 
+        DateTime now = DateTime.UtcNow;
+        bool isDoubleTap = (now - _viewModel.LastTapAt).TotalMilliseconds < 300 &&
+                           SKPoint.Distance(pagePt, _viewModel.LastTapPoint) < 10;
+
+        // A tap on a calendar day cell opens the event editor (double-click to add/edit events).
+        DateTime? day = HitTestDayCell(pagePt);
+        if (day.HasValue)
+        {
+            if (isDoubleTap)
+            {
+                OpenEventEditor(day.Value);
+            }
+
+            _viewModel.LastTapAt = now;
+            _viewModel.LastTapPoint = pagePt;
+            return;
+        }
+
         SKRect targetRect = GetCurrentTargetRect(hitRect);
         if (targetRect.Contains(pagePt))
         {
-            DateTime now = DateTime.UtcNow;
-            if ((now - _viewModel.LastTapAt).TotalMilliseconds < 300 &&
-                SKPoint.Distance(pagePt, _viewModel.LastTapPoint) < 10)
+            if (isDoubleTap)
             {
                 // Execute command on UI thread
                 MainThread.BeginInvokeOnMainThread(async () =>
@@ -455,6 +486,24 @@ public partial class DesignerPage : ContentPage
             _viewModel.LastTapAt = now;
             _viewModel.LastTapPoint = pagePt;
         }
+    }
+
+    private DateTime? HitTestDayCell(SKPoint pt)
+    {
+        foreach (KeyValuePair<DateTime, SKRect> cell in _viewModel.LastDayCells)
+        {
+            if (cell.Value.Contains(pt))
+            {
+                return cell.Key;
+            }
+        }
+
+        return null;
+    }
+
+    private void OpenEventEditor(DateTime date)
+    {
+        MainThread.BeginInvokeOnMainThread(async () => await _viewModel.OpenEventEditorAsync(date));
     }
 
     private int HitTestSlot(SKPoint pt)

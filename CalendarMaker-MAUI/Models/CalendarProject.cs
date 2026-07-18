@@ -73,6 +73,11 @@ public sealed class CalendarProject
     public Dictionary<int, PhotoLayout> MonthPhotoLayouts { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the user-defined calendar events drawn onto the day cells.
+    /// </summary>
+    public List<CalendarEvent> Events { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the photo layout for the front cover.
     /// </summary>
     public PhotoLayout FrontCoverPhotoLayout { get; set; } = PhotoLayout.Single;

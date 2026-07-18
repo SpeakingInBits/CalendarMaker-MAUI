@@ -86,6 +86,12 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </summary>
     public SKRect LastContentRect { get; private set; }
 
+    /// <summary>
+    /// Cached day-cell rectangles for the current month page, keyed by date. Used to hit-test
+    /// taps/clicks so the user can add events to a specific day.
+    /// </summary>
+    public Dictionary<DateTime, SKRect> LastDayCells { get; } = new();
+
     #endregion
 
     #region Gesture State (for touch handling)
@@ -450,6 +456,39 @@ public sealed partial class DesignerViewModel : ObservableObject
         };
 
         modal.Cancelled += async (_, __) =>
+        {
+            await _navigationService.PopModalAsync();
+        };
+
+        await _navigationService.PushModalAsync(modal, true);
+    }
+
+    /// <summary>
+    /// Opens the event editor for the given calendar day, letting the user add, edit, or remove
+    /// events. Persists changes and refreshes the canvas as events are modified.
+    /// </summary>
+    /// <param name="date">The calendar day that was activated (double-clicked or right-clicked).</param>
+    public async Task OpenEventEditorAsync(DateTime date)
+    {
+        if (Project == null)
+        {
+            return;
+        }
+
+        var modal = new Views.EventEditorModal(Project, date);
+
+        modal.EventsChanged += async (_, __) =>
+        {
+            if (Project == null)
+            {
+                return;
+            }
+
+            await _storage.UpdateProjectAsync(Project);
+            OnPropertyChanged(nameof(Project)); // Trigger canvas refresh to show event changes
+        };
+
+        modal.Closed += async (_, __) =>
         {
             await _navigationService.PopModalAsync();
         };
