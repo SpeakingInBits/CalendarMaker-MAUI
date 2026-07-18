@@ -86,6 +86,62 @@ public class CalendarRendererDayCellsTests
         }
     }
 
+    [Theory]
+    [InlineData("A really long multi word event title that must wrap onto several lines")]
+    [InlineData("Supercalifragilisticexpialidociousunbreakablesingleword")] // no spaces -> hard break
+    [InlineData("")] // empty title
+    [InlineData("Mom's Birthday 🎂 party 🎉")] // emoji in title (font fallback path)
+    [InlineData("🏈🎂🎉⭐❤️🎄")] // emoji-only title
+    public void RenderCalendarGrid_WithLongOrAwkwardTitle_WrapsWithoutThrowing(string title)
+    {
+        var renderer = CreateRenderer();
+        var project = new CalendarProject { FirstDayOfWeek = DayOfWeek.Sunday };
+        project.Events.Add(new CalendarEvent
+        {
+            Title = title,
+            ColorHex = "#4E79A7",
+            Recurrence = EventRecurrence.Annually,
+            Month = 1,
+            Day = 15
+        });
+        var (bmp, canvas) = CreateCanvas();
+
+        using (bmp)
+        using (canvas)
+        {
+            // Use a narrow grid so day cells are small and wrapping/hard-breaking is exercised.
+            var act = () => renderer.RenderCalendarGrid(canvas, new SKRect(0, 0, 240, 260), project, 2025, 1);
+            act.Should().NotThrow();
+        }
+    }
+
+    [Fact]
+    public void RenderCalendarGrid_ManyEventsOnOneDay_DoesNotThrow()
+    {
+        var renderer = CreateRenderer();
+        var project = new CalendarProject { FirstDayOfWeek = DayOfWeek.Sunday };
+        for (int i = 0; i < 10; i++)
+        {
+            project.Events.Add(new CalendarEvent
+            {
+                Title = $"Event number {i} with a fairly long title",
+                ColorHex = "#E15759",
+                Recurrence = EventRecurrence.None,
+                Year = 2025,
+                Month = 1,
+                Day = 15
+            });
+        }
+        var (bmp, canvas) = CreateCanvas();
+
+        using (bmp)
+        using (canvas)
+        {
+            var act = () => renderer.RenderCalendarGrid(canvas, new SKRect(0, 0, 600, 500), project, 2025, 1);
+            act.Should().NotThrow();
+        }
+    }
+
     [Fact]
     public void RenderCalendarGrid_NullDayCellBounds_IsAllowed()
     {
