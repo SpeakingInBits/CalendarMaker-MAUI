@@ -17,10 +17,10 @@ public partial class ProjectSettingsModal : ContentPage
         // Initialize page size picker
         PageSizePicker.ItemsSource = new List<string>
         {
-            "5×7 inches",
-            "Letter (8.5×11 inches)",
-            "Tabloid/Ledger (11×17 inches)",
-            "Super B (13×19 inches)",
+            "5Ã—7 inches",
+            "Letter (8.5Ã—11 inches)",
+            "Tabloid/Ledger (11Ã—17 inches)",
+            "Super B (13Ã—19 inches)",
             "12x12 inches (square)"
         };
 
@@ -231,21 +231,10 @@ public partial class ProjectSettingsModal : ContentPage
             _project.CoverSpec.CalendarSidePaddingPt = CalendarSidePaddingSlider.Value * 72.0;
             _project.CoverSpec.CalendarBottomPaddingPt = CalendarBottomPaddingSlider.Value * 72.0;
 
-            // If borderless is enabled, set all margins to 0
-            if (_project.CoverSpec.BorderlessCalendar)
-            {
-                _project.Margins.LeftPt = 0;
-                _project.Margins.TopPt = 0;
-                _project.Margins.RightPt = 0;
-                _project.Margins.BottomPt = 0;
-                _project.CoverSpec.BorderlessFrontCover = true;
-                _project.CoverSpec.BorderlessBackCover = true;
-            }
-            else
-            {
-                _project.CoverSpec.BorderlessFrontCover = false;
-                _project.CoverSpec.BorderlessBackCover = false;
-            }
+            // Margins are intentionally left untouched here: the renderers ignore them while
+            // borderless mode is active, so the user's margin values survive toggling it off.
+            _project.CoverSpec.BorderlessFrontCover = _project.CoverSpec.BorderlessCalendar;
+            _project.CoverSpec.BorderlessBackCover = _project.CoverSpec.BorderlessCalendar;
 
             // Update calendar settings
             if (int.TryParse(YearEntry.Text, out int year) && year >= 1900 && year <= 2100)
