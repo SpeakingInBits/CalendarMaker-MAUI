@@ -142,6 +142,37 @@ public class CalendarRendererDayCellsTests
         }
     }
 
+    [Theory]
+    [InlineData(true)]  // background color drawn in the padding area
+    [InlineData(false)] // no background: the grid must still be inset from the trim edge
+    public void RenderCalendarGrid_Borderless_KeepsGridInsideOverspraySafeZone(bool applyBackground)
+    {
+        var renderer = CreateRenderer();
+        var project = new CalendarProject { FirstDayOfWeek = DayOfWeek.Sunday };
+        project.CoverSpec.BorderlessCalendar = true;
+        project.CoverSpec.UseCalendarBackgroundOnBorderless = applyBackground;
+        // Paddings below the printable-safe minimum must be clamped up to 9pt so borderless
+        // overspray cannot clip the grid.
+        project.CoverSpec.CalendarTopPaddingPt = 0;
+        project.CoverSpec.CalendarSidePaddingPt = 0;
+        project.CoverSpec.CalendarBottomPaddingPt = 0;
+        var cells = new Dictionary<DateTime, SKRect>();
+        var bounds = new SKRect(0, 0, 600, 500);
+        var (bmp, canvas) = CreateCanvas();
+
+        using (bmp)
+        using (canvas)
+        {
+            renderer.RenderCalendarGrid(canvas, bounds, project, 2025, 1, applyBackground, cells);
+        }
+
+        cells.Should().HaveCount(31);
+        cells.Values.Should().OnlyContain(r =>
+            r.Left >= bounds.Left + 9f - 0.5f &&
+            r.Right <= bounds.Right - 9f + 0.5f &&
+            r.Bottom <= bounds.Bottom - 9f + 0.5f);
+    }
+
     [Fact]
     public void RenderCalendarGrid_NullDayCellBounds_IsAllowed()
     {

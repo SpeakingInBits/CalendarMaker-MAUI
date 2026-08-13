@@ -29,11 +29,13 @@ public sealed class PdfExportService : IPdfExportService
     private const float TargetDpi = 300f; // 300 DPI print quality
     private readonly ILayoutCalculator _layoutCalculator;
     private readonly IImageProcessor _imageProcessor;
+    private readonly ICalendarRenderer _calendarRenderer;
 
-    public PdfExportService(ILayoutCalculator layoutCalculator, IImageProcessor imageProcessor)
+    public PdfExportService(ILayoutCalculator layoutCalculator, IImageProcessor imageProcessor, ICalendarRenderer calendarRenderer)
     {
         _layoutCalculator = layoutCalculator;
         _imageProcessor = imageProcessor;
+        _calendarRenderer = calendarRenderer;
     }
 
     public Task<byte[]> ExportMonthAsync(CalendarProject project, int monthIndex)
@@ -62,37 +64,37 @@ public sealed class PdfExportService : IPdfExportService
         // Page 1: Month 5 photo (June) with Month 5 calendar (June)
         pages.Add(new DoubleSidedPageSpec(5, 5, false, false, false, false));
 
-        // Page 2: Month 6 photo (July) with Month 4 calendar (May) (rotated 180�)
+        // Page 2: Month 6 photo (July) with Month 4 calendar (May) (rotated 180째)
         pages.Add(new DoubleSidedPageSpec(6, 4, false, false, true, false));
 
         // Page 3: Month 4 photo (May) with Month 6 calendar (July)
         pages.Add(new DoubleSidedPageSpec(4, 6, false, false, false, false));
 
-        // Page 4: Month 7 photo (August) with Month 3 calendar (April) (rotated 180�)
+        // Page 4: Month 7 photo (August) with Month 3 calendar (April) (rotated 180째)
         pages.Add(new DoubleSidedPageSpec(7, 3, false, false, true, false));
 
         // Page 5: Month 3 photo (April) with Month 7 calendar (August)
         pages.Add(new DoubleSidedPageSpec(3, 7, false, false, false, false));
 
-        // Page 6: Month 8 photo (September) with Month 2 calendar (March) (rotated 180�)
+        // Page 6: Month 8 photo (September) with Month 2 calendar (March) (rotated 180째)
         pages.Add(new DoubleSidedPageSpec(8, 2, false, false, true, false));
 
         // Page 7: Month 2 photo (March) with Month 8 calendar (September)
         pages.Add(new DoubleSidedPageSpec(2, 8, false, false, false, false));
 
-        // Page 8: Month 9 photo (October) with Month 1 calendar (February) (rotated 180�)
+        // Page 8: Month 9 photo (October) with Month 1 calendar (February) (rotated 180째)
         pages.Add(new DoubleSidedPageSpec(9, 1, false, false, true, false));
 
         // Page 9: Month 1 photo (February) with Month 9 calendar (October)
         pages.Add(new DoubleSidedPageSpec(1, 9, false, false, false, false));
 
-        // Page 10: Month 10 photo (November) with Month 0 calendar (January) (rotated 180�)
+        // Page 10: Month 10 photo (November) with Month 0 calendar (January) (rotated 180째)
         pages.Add(new DoubleSidedPageSpec(10, 0, false, false, true, false));
 
         // Page 11: Month 0 photo (January) with Month 10 calendar (November)
         pages.Add(new DoubleSidedPageSpec(0, 10, false, false, false, false));
 
-        // Page 12: Month 11 photo (December current year) with Month -1 calendar (Previous December) (rotated 180�)
+        // Page 12: Month 11 photo (December current year) with Month -1 calendar (Previous December) (rotated 180째)
         // When includePreviousDecember is true, calendar shows previous year's December
         pages.Add(new DoubleSidedPageSpec(11, -1, includePreviousDecember, false, true, false));
 
@@ -100,7 +102,7 @@ public sealed class PdfExportService : IPdfExportService
         // When includePreviousDecember is true, photo shows previous year's December (stored as MonthIndex=-2)
         pages.Add(new DoubleSidedPageSpec(-1, 11, includePreviousDecember, false, false, false));
 
-        // Page 14: Front cover and rear cover (split page, rotated 180�)
+        // Page 14: Front cover and rear cover (split page, rotated 180째)
         pages.Add(new DoubleSidedPageSpec(0, 0, false, true, true, false));
 
         return RenderDoubleSidedDocumentAsync(project, pages, progress, cancellationToken);
@@ -183,7 +185,11 @@ public sealed class PdfExportService : IPdfExportService
                             page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
                             page.Margin(0);
                             page.DefaultTextStyle(x => x.FontSize(12));
-                            page.Content().Image(imgBytes).FitArea();
+                            // FitUnproportionally: the rasterized page bitmap can differ from the
+                            // PDF page aspect by a sub-pixel rounding amount; aspect-preserving
+                            // fitting would letterbox that difference into a hairline white edge
+                            // on borderless pages. Stretching by <1px is invisible.
+                            page.Content().Image(imgBytes).FitUnproportionally();
                         });
                     }
                 });
@@ -241,20 +247,23 @@ public sealed class PdfExportService : IPdfExportService
             sk.RotateDegrees(180);
         }
 
+        // Match the single-sided path: borderless pages use the full page, otherwise apply margins.
         var m = project.Margins;
-        var contentRect = new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
+        SKRect contentRect = project.CoverSpec.BorderlessCalendar
+            ? new SKRect(0, 0, pageWpt, pageHpt)
+            : new SKRect((float)m.LeftPt, (float)m.TopPt, pageWpt - (float)m.RightPt, pageHpt - (float)m.BottomPt);
 
         if (pageSpec.IsCoversPage)
         {
             // Page 14: Front and back covers using TwoHorizontalStack layout
-            // Top half: Back cover (rotated 180� because the whole page is already rotated)
+            // Top half: Back cover (rotated 180째 because the whole page is already rotated)
             // Bottom half: Front cover (normal, but appears upside down because whole page is rotated)
 
             // Split the content into two horizontal halves
             var topHalf = new SKRect(contentRect.Left, contentRect.Top, contentRect.Right, contentRect.MidY - 2f);
             var bottomHalf = new SKRect(contentRect.Left, contentRect.MidY + 2f, contentRect.Right, contentRect.Bottom);
 
-            // Draw back cover in top half (rotated 180� within the already-rotated page)
+            // Draw back cover in top half (rotated 180째 within the already-rotated page)
             sk.Save();
             sk.Translate(topHalf.MidX, topHalf.MidY);
             sk.RotateDegrees(180);
@@ -351,14 +360,16 @@ public sealed class PdfExportService : IPdfExportService
             }
 
             // Draw calendar for the calendar month
-            bool applyCalendarBackground = IsMonthPageBorderless(project) &&  
+            bool applyCalendarBackground = IsMonthPageBorderless(project) &&
               project.CoverSpec.UseCalendarBackgroundOnBorderless;
-            DrawCalendarGrid(sk, calRect, project, pageSpec.CalendarMonthIndex, applyCalendarBackground);
+            var (calYear, calMonth) = GetCalendarYearMonth(project, pageSpec.CalendarMonthIndex);
+            _calendarRenderer.RenderCalendarGrid(sk, calRect, project, calYear, calMonth, applyCalendarBackground);
         }
 
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
-        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 85);
+        // Quality 95: thin grid lines and small text show visible JPEG ringing at 85.
+        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 95);
         return data.ToArray();
     }
 
@@ -470,7 +481,11 @@ public sealed class PdfExportService : IPdfExportService
                             page.Size(new QuestPDF.Helpers.PageSize(pageWpt, pageHpt));
                             page.Margin(0);
                             page.DefaultTextStyle(x => x.FontSize(12));
-                            page.Content().Image(imgBytes).FitArea();
+                            // FitUnproportionally: the rasterized page bitmap can differ from the
+                            // PDF page aspect by a sub-pixel rounding amount; aspect-preserving
+                            // fitting would letterbox that difference into a hairline white edge
+                            // on borderless pages. Stretching by <1px is invisible.
+                            page.Content().Image(imgBytes).FitUnproportionally();
                         });
                     }
                 });
@@ -611,16 +626,16 @@ public sealed class PdfExportService : IPdfExportService
             }
             
             // Apply background to calendar area if this is a borderless month page
-      bool applyCalendarBackground = IsMonthPageBorderless(project) &&  
-      project.CoverSpec.UseCalendarBackgroundOnBorderless;
-          DrawCalendarGrid(sk, calRect, project, monthIndex, applyCalendarBackground);
+            bool applyCalendarBackground = IsMonthPageBorderless(project) &&
+                project.CoverSpec.UseCalendarBackgroundOnBorderless;
+            var (calYear, calMonth) = GetCalendarYearMonth(project, monthIndex);
+            _calendarRenderer.RenderCalendarGrid(sk, calRect, project, calYear, calMonth, applyCalendarBackground);
         }
 
         sk.Flush();
         using var snapshot = skSurface.Snapshot();
-        // Use JPEG with 85% quality - much faster encoding than PNG
-        // and adequate for intermediate format before PDF embedding
-        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 85);
+        // Quality 95: thin grid lines and small text show visible JPEG ringing at 85.
+        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 95);
         return data.ToArray();
     }
 
@@ -639,272 +654,33 @@ public sealed class PdfExportService : IPdfExportService
 #endif
     }
 
-    private static void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
+    private void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)
     {
-        float imgW = (float)bmp.Width;
-        float imgH = (float)bmp.Height;
-        float rectW = rect.Width;
-        float rectH = rect.Height;
-        float imgAspect = imgW / imgH;
-        float rectAspect = rectW / rectH;
-
-        float baseScale = imgAspect > rectAspect ? rectH / imgH : rectW / imgW;
-        float scale = baseScale * (float)Math.Clamp(asset.Zoom <= 0 ? 1 : asset.Zoom, 0.5, 3.0);
-        float targetW = imgW * scale;
-        float targetH = imgH * scale;
-        float excessX = Math.Max(0, (targetW - rectW) / 2f);
-        float excessY = Math.Max(0, (targetH - rectH) / 2f);
-        float px = (float)Math.Clamp(asset.PanX, -1, 1);
-        float py = (float)Math.Clamp(asset.PanY, -1, 1);
-
-        float left = rect.Left - excessX + px * excessX;
-        float top = rect.Top - excessY + py * excessY;
-        var dest = new SKRect(left, top, left + targetW, top + targetH);
+        // Shared pan/zoom math so the export matches the designer preview exactly.
+        var dest = _imageProcessor.CalculateTransformedRect(bmp.Width, bmp.Height, rect, asset);
 
         using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.Medium };
         canvas.DrawBitmap(bmp, dest, paint);
     }
 
-    private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex)
+    /// <summary>
+    /// Maps a 0-based month page index (relative to StartMonth; -1 = previous year's December)
+    /// to the actual calendar year and month.
+    /// </summary>
+    private static (int year, int month) GetCalendarYearMonth(CalendarProject project, int monthIndex)
     {
-        // Handle previous December (month index -1)
-        int month, year;
         if (monthIndex == -1)
         {
-            // Previous year's December
-            month = 12;
-            year = project.Year - 1;
-        }
-        else
-        {
-            // Normal month calculation
-            month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
-            year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
+            return (project.Year - 1, 12);
         }
 
-        var engine = new CalendarEngine();
-        var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
-
-        float headerH = 40;
-        var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
-        var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
-
-        using var titlePaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 18, IsAntialias = true };
-        string title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        float titleWidth = titlePaint.MeasureText(title);
-        canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
-
-        // NOW draw white rectangle to cut out background, but only BELOW the header
-        // This leaves the header in the colored area
-        using var clearPaint = new SKPaint
-        {
-            Color = SKColors.White,
-            Style = SKPaintStyle.Fill
-        };
-        canvas.DrawRect(gridRect, clearPaint);
-
-        // Render day-of-week headers
-      float dowH = 20;
-        var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
-        string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-        int shift = (int)project.FirstDayOfWeek;
-     string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
-
-  using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
-   using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
-
-        float colW = dowRect.Width / 7f;
-        for (int c = 0; c < 7; c++)
-      {
-       var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
-     string t = displayDows[c];
-     float tw = textPaint.MeasureText(t);
-            canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-        canvas.DrawRect(cell, gridPen);
-   }
-
-        // Render day grid
-   var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
-        int rows = weeks.Count;
-        float rowH = weeksArea.Height / rows;
-        for (int r = 0; r < rows; r++)
-        {
-      for (int c = 0; c < 7; c++)
-       {
-            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-           canvas.DrawRect(cell, gridPen);
-              var date = weeks[r][c];
-        if (date.HasValue && date.Value.Month == month)
-        {
-       string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
-        canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-        CalendarEventDrawing.DrawDayEvents(canvas, cell, project, date.Value);
-        }
-         }
-        }
-    }
-
-    private static void DrawCalendarGrid(SKCanvas canvas, SKRect bounds, CalendarProject project, int monthIndex, bool applyBackground)
-    {
-        SKRect calendarRect = bounds;
-
-        // Apply padding to the calendar grid if in borderless mode
-  if (applyBackground && project.CoverSpec.BorderlessCalendar)
-     {
-   float topPadding = (float)project.CoverSpec.CalendarTopPaddingPt;
-     float sidePadding = (float)project.CoverSpec.CalendarSidePaddingPt;
-      float bottomPadding = (float)project.CoverSpec.CalendarBottomPaddingPt;
-
-            calendarRect = new SKRect(
-       bounds.Left + sidePadding,
-bounds.Top + topPadding,
-bounds.Right - sidePadding,
-     bounds.Bottom - bottomPadding
-      );
-
-       // Draw background color ONLY in the padding area (not under the calendar grid)
-  if (!string.IsNullOrEmpty(project.Theme.BackgroundColor))
-      {
-    using var bgPaint = new SKPaint
-   {
-   Color = SKColor.Parse(project.Theme.BackgroundColor),
-      Style = SKPaintStyle.Fill
-    };
-  
-       // Draw background in the full bounds area
-  canvas.DrawRect(bounds, bgPaint);
-  
-  // Get month and year for the month name
- int month, year;
-  if (monthIndex == -1)
-       {
-   month = 12;
-    year = project.Year - 1;
-     }
-      else
-   {
-        month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
-         year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
-         }
-
-    // Render calendar with header in colored area
-       DrawCalendarGridWithHeaderInPadding(canvas, calendarRect, project, year, month);
-    return;
-   }
-        }
- else if (applyBackground && !string.IsNullOrEmpty(project.Theme.BackgroundColor))
-      {
-   // Non-borderless mode: fill entire area with background
-       using var bgPaint = new SKPaint
-{
- Color = SKColor.Parse(project.Theme.BackgroundColor),
-Style = SKPaintStyle.Fill
-   };
-      canvas.DrawRect(bounds, bgPaint);
-    }
-
-// Draw standard calendar grid
-   DrawCalendarGrid(canvas, calendarRect, project, monthIndex);
-    }
-
-    private static void DrawCalendarGridWithHeaderInPadding(SKCanvas canvas, SKRect bounds, CalendarProject project, int year, int month)
-  {
-  var engine = new CalendarEngine();
-  var weeks = engine.BuildMonthGrid(year, month, project.FirstDayOfWeek);
-
-    float headerH = 40;
-  var headerRect = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + headerH);
-   var gridRect = new SKRect(bounds.Left, headerRect.Bottom, bounds.Right, bounds.Bottom);
-
-        // Render month/year title - this will appear in the colored padding area
-   // Determine text color based on background
-     SKColor titleColor = GetContrastingTextColor(project.Theme.BackgroundColor);
-  using var titlePaint = new SKPaint 
-        { 
-   Color = titleColor, 
-TextSize = 18, 
-  IsAntialias = true 
-   };
-    
- string title = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-     float titleWidth = titlePaint.MeasureText(title);
-   canvas.DrawText(title, gridRect.MidX - titleWidth / 2, headerRect.MidY + titlePaint.TextSize / 2.5f, titlePaint);
-
-   // NOW draw white rectangle to cut out background, but only BELOW the header
-  // This leaves the header in the colored area
-        using var clearPaint = new SKPaint
-        {
-   Color = SKColors.White,
- Style = SKPaintStyle.Fill
- };
-  canvas.DrawRect(gridRect, clearPaint);
-
- // Render day-of-week headers
-      float dowH = 20;
-    var dowRect = new SKRect(gridRect.Left, gridRect.Top, gridRect.Right, gridRect.Top + dowH);
-      string[] dows = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-    int shift = (int)project.FirstDayOfWeek;
-     string[] displayDows = Enumerable.Range(0, 7).Select(i => dows[(i + shift) % 7]).ToArray();
-
-  using var gridPen = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 0.5f };
-   using var textPaint = new SKPaint { Color = SKColor.Parse(project.Theme.PrimaryTextColor), TextSize = 10, IsAntialias = true };
-
-        float colW = dowRect.Width / 7f;
-        for (int c = 0; c < 7; c++)
-      {
-       var cell = new SKRect(dowRect.Left + c * colW, dowRect.Top, dowRect.Left + (c + 1) * colW, dowRect.Bottom);
-     string t = displayDows[c];
-   float tw = textPaint.MeasureText(t);
-    canvas.DrawText(t, cell.MidX - tw / 2, cell.MidY + textPaint.TextSize / 2.5f, textPaint);
-        canvas.DrawRect(cell, gridPen);
-   }
-
-        // Render day grid
-   var weeksArea = new SKRect(gridRect.Left, dowRect.Bottom, gridRect.Right, gridRect.Bottom);
-        int rows = weeks.Count;
-        float rowH = weeksArea.Height / rows;
-        for (int r = 0; r < rows; r++)
-        {
-      for (int c = 0; c < 7; c++)
-       {
-            var cell = new SKRect(weeksArea.Left + c * colW, weeksArea.Top + r * rowH, weeksArea.Left + (c + 1) * colW, weeksArea.Top + (r + 1) * rowH);
-           canvas.DrawRect(cell, gridPen);
-       var date = weeks[r][c];
-    if (date.HasValue && date.Value.Month == month)
-        {
-     string dayStr = date.Value.Day.ToString(CultureInfo.InvariantCulture);
-        canvas.DrawText(dayStr, cell.Left + 2, cell.Top + textPaint.TextSize + 2, textPaint);
-        CalendarEventDrawing.DrawDayEvents(canvas, cell, project, date.Value);
-        }
-      }
-     }
-    }
-
-    private static SKColor GetContrastingTextColor(string? backgroundColor)
-    {
-  if (string.IsNullOrEmpty(backgroundColor))
-        {
-   return SKColors.Black;
-   }
-
-  try
-   {
-      SKColor bgColor = SKColor.Parse(backgroundColor);
-   
- // Calculate relative luminance
-         float luminance = (0.299f * bgColor.Red + 0.587f * bgColor.Green + 0.114f * bgColor.Blue) / 255f;
-   
-  // Use white text for dark backgrounds, black for light backgrounds
-    return luminance > 0.5f ? SKColors.Black : SKColors.White;
-        }
-        catch
-      {
-     return SKColors.Black;
-  }
+        int month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
+        int year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
+        return (year, month);
     }
 
     private static bool IsMonthPageBorderless(CalendarProject project)
-  {
+    {
         // Check if borderless calendar mode is enabled
         return project.CoverSpec.BorderlessCalendar;
     }
