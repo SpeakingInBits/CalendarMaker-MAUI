@@ -18,7 +18,7 @@
                                            TextColor="Gray" 
                                            VerticalTextAlignment="Center" />
                                 </HorizontalStackLayout>
-                                <Label Text="{Binding Year}" />
+                                <Label Text="{Binding YearRangeDisplay}" />
                             </VerticalStackLayout>
                             <HorizontalStackLayout Grid.Column="1" Spacing="6">
                                 <Button Text="Open" CommandParameter="{Binding .}" Clicked="OnOpenClicked" />

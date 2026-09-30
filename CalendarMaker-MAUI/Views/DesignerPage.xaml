@@ -126,7 +126,7 @@
                         Command="{Binding ExportCurrentPageCommand}" />
                 <Button Text="Export Cover (PDF)" 
                         Command="{Binding ExportCoverCommand}" />
-                <Button Text="Export Full Year (PDF)" 
+                <Button Text="Export Full Calendar (PDF)" 
                         Command="{Binding ExportYearCommand}" />
                 <Button Text="Export Double-Sided (PDF)" 
                         Command="{Binding ExportDoubleSidedCommand}" />

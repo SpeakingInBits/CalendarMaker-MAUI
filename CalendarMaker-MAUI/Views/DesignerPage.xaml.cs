@@ -150,6 +150,7 @@ public partial class DesignerPage : ContentPage
         SKRect contentRect;
 
         int pageIndex = _viewModel.PageIndex;
+        bool isBackCover = _viewModel.IsBackCoverPage;
 
         // Use BorderlessCalendar property for all pages when enabled
         if (project.CoverSpec.BorderlessCalendar)
@@ -166,7 +167,7 @@ public partial class DesignerPage : ContentPage
         }
 
         // Handle double-sided cover rendering
-        if (project.EnableDoubleSided && (pageIndex == -1 || pageIndex == 12))
+        if (project.EnableDoubleSided && (pageIndex == -1 || isBackCover))
         {
             if (pageIndex == -1)
             {
@@ -253,7 +254,7 @@ public partial class DesignerPage : ContentPage
      project.CoverSpec.UseCalendarBackgroundOnBorderless;
        _calendarRenderer.RenderCalendarGrid(canvas, calRect, project, project.Year - 1, 12, applyCalendarBackground, _viewModel.LastDayCells);
         }
-        else if (pageIndex == 12) // Back cover
+        else if (_viewModel.IsBackCoverPage) // Back cover
         {
             PhotoLayout layout = project.BackCoverPhotoLayout;
             photoSlots = _layoutCalculator.ComputePhotoSlots(contentRect, layout);
@@ -288,8 +289,9 @@ public partial class DesignerPage : ContentPage
                 pageIndex,
                 activeSlotIndex);
 
-            int month = ((project.StartMonth - 1 + pageIndex) % 12) + 1;
-            int year = project.Year + (project.StartMonth - 1 + pageIndex) / 12;
+            DateTime monthDate = project.GetMonthDate(pageIndex);
+            int month = monthDate.Month;
+            int year = monthDate.Year;
 
             // Apply background to calendar area if this is a borderless month page
             bool applyCalendarBackground = IsMonthPageBorderless(project) &&
@@ -329,7 +331,7 @@ public partial class DesignerPage : ContentPage
             (touchPx.Y - _pageOffsetY) / _pageScale);
 
         int pageIndex = _viewModel.PageIndex;
-        bool isCover = pageIndex == -1 || pageIndex == 12;
+        bool isCover = pageIndex == -1 || _viewModel.IsBackCoverPage;
         SKRect hitRect = isCover ? _viewModel.LastContentRect : _viewModel.LastPhotoRect;
 
         // Right-click a calendar day to add/edit events (desktop). Double-click works everywhere.

@@ -7,11 +7,11 @@ customizable photo calendars. Design professional monthly calendars with your ph
 
 ### Calendar Creation
 
-- **Monthly Calendar Generation**: Create calendars with 12 customizable monthly pages
-- **Flexible Start Month**: Begin your calendar from any month of the year
+- **Monthly Calendar Generation**: Create calendars with customizable monthly pages
+- **Custom Date Range**: Choose a start and end month (up to 24 months), e.g. October 2026 through December 2027
 - **First Day of Week**: Choose between Sunday or Monday as the first day
 - **Year Selection**: Create calendars for any year (1900-2100)
-- **Double-Sided Calendars**: Yearly calendars that will print front and back (current version always starts in January and also shows the previous year December)
+- **Double-Sided Calendars**: Yearly calendars that will print front and back (requires a 12-month range; current version always starts in January and also shows the previous year December)
 
 ### Photo Management
 
@@ -37,7 +37,7 @@ customizable photo calendars. Design professional monthly calendars with your ph
   - Photo Right / Calendar Left
 - **Adjustable Split Ratio**: Control the space allocation between photos and calendar (30%-70%)
 - **Visual Designer**: Interactive canvas with live preview of your calendar pages
-- **Page Navigation**: Easily navigate between cover pages and all 12 months
+- **Page Navigation**: Easily navigate between cover pages and every month in the calendar
 
 ### Page Sizes & Export
 
@@ -51,7 +51,7 @@ customizable photo calendars. Design professional monthly calendars with your ph
   - Export individual months
   - Export front cover only
   - Export back cover only
-  - Export complete year (all pages)
+  - Export the complete calendar (all pages)
 - **Progress Tracking**: Visual progress indicator for multi-page exports
 - **Parallel Rendering**: Fast export using optimized parallel processing
 
@@ -160,7 +160,7 @@ CalendarMaker-MAUI/
 
 1. **Create a New Project**
    - Launch the app and click "Create New Project"
-   - Set your calendar year and start month
+   - Set your calendar year, then adjust the start and end months in Project Settings
    - Choose page size and orientation
    - Select default layout preferences
 
@@ -178,7 +178,7 @@ CalendarMaker-MAUI/
 
 4. **Export Your Calendar**
    - Export individual months or covers
-   - Export complete year with all pages
+   - Export the complete calendar with all pages
    - Choose export location
    - PDFs are generated at 300 DPI for professional printing
 

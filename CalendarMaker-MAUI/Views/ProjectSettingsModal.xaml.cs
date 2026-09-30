@@ -4,7 +4,14 @@ namespace CalendarMaker_MAUI.Views;
 
 public partial class ProjectSettingsModal : ContentPage
 {
+    private const int MinYear = 1900;
+    private const int MaxYear = 2100;
+
     private CalendarProject? _project;
+
+    // Length of the date range in months, kept so moving the start date shifts the end date with it.
+    private int _monthCount;
+    private bool _syncingDateRange;
 
     public event EventHandler? Cancelled;
     public event EventHandler? Applied;
@@ -56,16 +63,23 @@ public partial class ProjectSettingsModal : ContentPage
         CalendarSidePaddingSlider.Value = _project.CoverSpec.CalendarSidePaddingPt / 72.0;
         CalendarBottomPaddingSlider.Value = _project.CoverSpec.CalendarBottomPaddingPt / 72.0;
 
-        // Initialize calendar settings
-        YearEntry.Text = _project.Year.ToString();
-
-        // Populate month names
-        StartMonthPicker.ItemsSource = new List<string>
+        // Initialize calendar date range
+        var monthNames = new List<string>
         {
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"
         };
+        StartMonthPicker.ItemsSource = monthNames;
+        EndMonthPicker.ItemsSource = monthNames;
+
+        _monthCount = _project.MonthCount;
+        _syncingDateRange = true;
+        YearEntry.Text = _project.Year.ToString();
         StartMonthPicker.SelectedIndex = _project.StartMonth - 1;
+        EndYearEntry.Text = _project.EndDate.Year.ToString();
+        EndMonthPicker.SelectedIndex = _project.EndDate.Month - 1;
+        _syncingDateRange = false;
+        UpdateDateRangeSummary();
 
         // Populate day of week names
         FirstDayOfWeekPicker.ItemsSource = new List<string>
@@ -90,6 +104,112 @@ public partial class ProjectSettingsModal : ContentPage
         // Handle picker changes
         PageSizePicker.SelectedIndexChanged += OnPageSizeChanged;
         OrientationPicker.SelectedIndexChanged += OnOrientationChanged;
+
+        // Keep the date range consistent as the user edits it
+        StartMonthPicker.SelectedIndexChanged += OnStartDateChanged;
+        YearEntry.TextChanged += OnStartDateChanged;
+        EndMonthPicker.SelectedIndexChanged += OnEndDateChanged;
+        EndYearEntry.TextChanged += OnEndDateChanged;
+    }
+
+    private void OnStartDateChanged(object? sender, EventArgs e)
+    {
+        if (_syncingDateRange)
+        {
+            return;
+        }
+
+        // Move the end date along with the start date so the calendar keeps its length.
+        if (TryGetMonth(YearEntry, StartMonthPicker, out DateTime start))
+        {
+            DateTime end = start.AddMonths(_monthCount - 1);
+            _syncingDateRange = true;
+            EndYearEntry.Text = end.Year.ToString();
+            EndMonthPicker.SelectedIndex = end.Month - 1;
+            _syncingDateRange = false;
+        }
+
+        UpdateDateRangeSummary();
+    }
+
+    private void OnEndDateChanged(object? sender, EventArgs e)
+    {
+        if (_syncingDateRange)
+        {
+            return;
+        }
+
+        if (TryGetDateRange(out _, out _, out int count, out _))
+        {
+            _monthCount = count;
+        }
+
+        UpdateDateRangeSummary();
+    }
+
+    private void UpdateDateRangeSummary()
+    {
+        if (TryGetDateRange(out DateTime start, out DateTime end, out int count, out string? error))
+        {
+            DateRangeSummaryLabel.Text = $"{count} {(count == 1 ? "month" : "months")}: " +
+                $"{start:MMMM yyyy} through {end:MMMM yyyy}";
+            DateRangeSummaryLabel.TextColor = Colors.Gray;
+        }
+        else
+        {
+            DateRangeSummaryLabel.Text = error;
+            DateRangeSummaryLabel.TextColor = Colors.Red;
+        }
+    }
+
+    private static bool TryGetMonth(Entry yearEntry, Picker monthPicker, out DateTime month)
+    {
+        month = default;
+        if (!int.TryParse(yearEntry.Text, out int year) || year < MinYear || year > MaxYear ||
+            monthPicker.SelectedIndex < 0)
+        {
+            return false;
+        }
+
+        month = new DateTime(year, monthPicker.SelectedIndex + 1, 1);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads and validates the start and end dates entered by the user.
+    /// </summary>
+    private bool TryGetDateRange(out DateTime start, out DateTime end, out int count, out string? error)
+    {
+        count = 0;
+        end = default;
+
+        if (!TryGetMonth(YearEntry, StartMonthPicker, out start))
+        {
+            error = $"Enter a start year between {MinYear} and {MaxYear}.";
+            return false;
+        }
+
+        if (!TryGetMonth(EndYearEntry, EndMonthPicker, out end))
+        {
+            error = $"Enter an end year between {MinYear} and {MaxYear}.";
+            return false;
+        }
+
+        count = CalendarProject.CountMonths(start.Year, start.Month, end.Year, end.Month);
+        if (count < 1)
+        {
+            error = "The end date must be on or after the start date.";
+            return false;
+        }
+
+        if (count > CalendarProject.MaxMonthCount)
+        {
+            error = $"A calendar can span at most {CalendarProject.MaxMonthCount} months (this range is {count}).";
+            return false;
+        }
+
+        error = null;
+        return true;
     }
 
     private void OnBackgroundColorChanged(object? sender, TextChangedEventArgs e)
@@ -201,10 +321,27 @@ public partial class ProjectSettingsModal : ContentPage
         Cancelled?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnApplyClicked(object? sender, EventArgs e)
+    private async void OnApplyClicked(object? sender, EventArgs e)
     {
         if (_project != null)
         {
+            // Validate the date range before changing anything so an invalid range leaves the project untouched
+            if (!TryGetDateRange(out DateTime start, out DateTime end, out int count, out string? error))
+            {
+                await DisplayAlert("Invalid Date Range", error, "OK");
+                return;
+            }
+
+            if (DoubleSidedCheckbox.IsChecked && count != 12)
+            {
+                await DisplayAlert(
+                    "Invalid Date Range",
+                    $"Double-sided calendars must span exactly 12 months, but this range is {count}. " +
+                    "Adjust the dates or turn off Double-Sided Calendar.",
+                    "OK");
+                return;
+            }
+
             // Update page size and orientation
             _project.PageSpec.Size = PageSizePicker.SelectedIndex switch
             {
@@ -237,12 +374,7 @@ public partial class ProjectSettingsModal : ContentPage
             _project.CoverSpec.BorderlessBackCover = _project.CoverSpec.BorderlessCalendar;
 
             // Update calendar settings
-            if (int.TryParse(YearEntry.Text, out int year) && year >= 1900 && year <= 2100)
-            {
-                _project.Year = year;
-            }
-
-            _project.StartMonth = StartMonthPicker.SelectedIndex + 1;
+            _project.SetDateRange(start.Year, start.Month, end.Year, end.Month);
             _project.FirstDayOfWeek = (DayOfWeek)FirstDayOfWeekPicker.SelectedIndex;
             _project.EnableDoubleSided = DoubleSidedCheckbox.IsChecked;
 
