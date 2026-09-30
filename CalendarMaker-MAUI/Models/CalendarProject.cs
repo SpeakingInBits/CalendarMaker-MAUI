@@ -1,5 +1,6 @@
 namespace CalendarMaker_MAUI.Models;
 
+using System.Text.Json.Serialization;
 using CalendarMaker_MAUI.Services;
 
 /// <summary>
@@ -26,6 +27,88 @@ public sealed class CalendarProject
     /// Gets or sets the starting month of the calendar. Valid values are 1 through 12, where 1 is January.
     /// </summary>
     public int StartMonth { get; set; } = 1; // 1..12
+
+    /// <summary>
+    /// The largest number of month pages a single calendar project may span.
+    /// </summary>
+    public const int MaxMonthCount = 24;
+
+    private int _monthCount = 12;
+
+    /// <summary>
+    /// Gets or sets the number of month pages in the calendar, starting at <see cref="StartMonth"/> of
+    /// <see cref="Year"/>. Clamped to 1 through <see cref="MaxMonthCount"/>. Defaults to 12 so projects
+    /// saved before custom date ranges existed keep their one-year span.
+    /// </summary>
+    public int MonthCount
+    {
+        get => _monthCount;
+        set => _monthCount = Math.Clamp(value, 1, MaxMonthCount);
+    }
+
+    /// <summary>
+    /// Gets the first day of the first month in the calendar.
+    /// </summary>
+    [JsonIgnore]
+    public DateTime StartDate => new(Year, StartMonth, 1);
+
+    /// <summary>
+    /// Gets the first day of the last month in the calendar.
+    /// </summary>
+    [JsonIgnore]
+    public DateTime EndDate => StartDate.AddMonths(MonthCount - 1);
+
+    /// <summary>
+    /// Gets the designer page index of the back cover, which follows the last month page.
+    /// </summary>
+    [JsonIgnore]
+    public int BackCoverPageIndex => MonthCount;
+
+    /// <summary>
+    /// Gets a value indicating whether the date range fits the fixed 12-month double-sided layout.
+    /// </summary>
+    [JsonIgnore]
+    public bool SupportsDoubleSided => MonthCount == 12;
+
+    /// <summary>
+    /// Gets a year label for the calendar's date range, e.g. "2026" or "2026-2027".
+    /// </summary>
+    [JsonIgnore]
+    public string YearRangeDisplay => EndDate.Year == Year ? $"{Year}" : $"{Year}-{EndDate.Year}";
+
+    /// <summary>
+    /// Maps a 0-based month page index (relative to the start month) to the first day of that month.
+    /// </summary>
+    /// <param name="monthIndex">The month page index, where 0 is the start month.</param>
+    public DateTime GetMonthDate(int monthIndex) => StartDate.AddMonths(monthIndex);
+
+    /// <summary>
+    /// Counts the months in an inclusive month range, e.g. October 2026 through December 2027 is 15.
+    /// Returns zero or less when the end precedes the start.
+    /// </summary>
+    public static int CountMonths(int startYear, int startMonth, int endYear, int endMonth)
+        => ((endYear - startYear) * 12) + (endMonth - startMonth) + 1;
+
+    /// <summary>
+    /// Sets the calendar to span from the start month through the end month, inclusive.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The end precedes the start, or the range spans more than <see cref="MaxMonthCount"/> months.
+    /// </exception>
+    public void SetDateRange(int startYear, int startMonth, int endYear, int endMonth)
+    {
+        int count = CountMonths(startYear, startMonth, endYear, endMonth);
+        if (count < 1 || count > MaxMonthCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(endMonth),
+                $"The date range must span 1 to {MaxMonthCount} months, but spans {count}.");
+        }
+
+        Year = startYear;
+        StartMonth = startMonth;
+        MonthCount = count;
+    }
 
     /// <summary>
     /// Gets or sets the first day of the week for calendar display purposes.
@@ -68,7 +151,7 @@ public sealed class CalendarProject
     public List<ImageAsset> ImageAssets { get; set; } = new();
 
     /// <summary>
-    /// Gets or sets the per-month photo layout overrides, where the key is the month index (0-11) relative to StartMonth.
+    /// Gets or sets the per-month photo layout overrides, where the key is the month index (0 to MonthCount - 1) relative to StartMonth.
     /// </summary>
     public Dictionary<int, PhotoLayout> MonthPhotoLayouts { get; set; } = new();
 

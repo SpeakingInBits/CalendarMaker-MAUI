@@ -221,6 +221,62 @@ public class DesignerViewModelTests
         _viewModel.ActiveSlotIndex.Should().Be(0);
     }
 
+    [Fact]
+    public void NavigatePage_WithCustomDateRange_ShouldWrapAtCustomBackCover()
+    {
+        // Arrange - October 2026 through December 2027 (15 months), back cover at index 15
+        var project = CreateTestProject();
+        project.SetDateRange(2026, 10, 2027, 12);
+        SetupProjectInViewModel(project);
+        _viewModel.PageIndex = -1; // Front cover
+
+        // Act
+        _viewModel.NavigatePageCommand.Execute(-1);
+
+        // Assert
+        _viewModel.PageIndex.Should().Be(15);
+        _viewModel.IsBackCoverPage.Should().BeTrue();
+        _viewModel.PageLabel.Should().Be("Back Cover");
+
+        _viewModel.NavigatePageCommand.Execute(1);
+        _viewModel.PageIndex.Should().Be(-1); // Wraps back to front cover
+    }
+
+    [Fact]
+    public void NavigatePage_WithCustomDateRange_ShouldTreatIndex12AsMonthPage()
+    {
+        // Arrange - index 12 is the back cover for a 12-month calendar, but a month page here
+        var project = CreateTestProject();
+        project.SetDateRange(2026, 10, 2027, 12);
+        SetupProjectInViewModel(project);
+        _viewModel.PageIndex = 11;
+
+        // Act
+        _viewModel.NavigatePageCommand.Execute(1);
+
+        // Assert
+        _viewModel.PageIndex.Should().Be(12);
+        _viewModel.IsBackCoverPage.Should().BeFalse();
+        _viewModel.PageLabel.Should().Be("October 2027");
+    }
+
+    [Fact]
+    public void NavigatePage_WithCustomDateRange_ShouldLabelLastMonth()
+    {
+        // Arrange
+        var project = CreateTestProject();
+        project.SetDateRange(2026, 10, 2027, 12);
+        SetupProjectInViewModel(project);
+        _viewModel.PageIndex = 13;
+
+        // Act
+        _viewModel.NavigatePageCommand.Execute(1);
+
+        // Assert
+        _viewModel.PageIndex.Should().Be(14);
+        _viewModel.PageLabel.Should().Be("December 2027");
+    }
+
     #endregion
 
     #region FlipLayout Tests
@@ -390,6 +446,25 @@ public class DesignerViewModelTests
         result.Should().NotBeNull();
         result.Id.Should().Be("back-1");
         result.Role.Should().Be("backCoverPhoto");
+    }
+
+    [Fact]
+    public void GetActiveAsset_OnCustomRangeBackCover_ShouldReturnBackCoverPhoto()
+    {
+        // Arrange - 15-month calendar, so the back cover is page 15
+        var project = CreateTestProject();
+        project.SetDateRange(2026, 10, 2027, 12);
+        project.ImageAssets.Add(new ImageAsset { Id = "back-1", Role = "backCoverPhoto", SlotIndex = 0, Path = "back.jpg" });
+        project.ImageAssets.Add(new ImageAsset { Id = "month-12", Role = "monthPhoto", MonthIndex = 12, SlotIndex = 0, Path = "month.jpg" });
+        SetupProjectInViewModel(project);
+        _viewModel.ActiveSlotIndex = 0;
+
+        // Act & Assert
+        _viewModel.PageIndex = 15;
+        _viewModel.GetActiveAsset()!.Id.Should().Be("back-1");
+
+        _viewModel.PageIndex = 12;
+        _viewModel.GetActiveAsset()!.Id.Should().Be("month-12");
     }
 
     [Fact]

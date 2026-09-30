@@ -381,7 +381,7 @@ public sealed class PdfExportService : IPdfExportService
             pages.Add((0, true, false));
         }
 
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < project.MonthCount; i++)
         {
             pages.Add((i, false, false));
         }
@@ -446,7 +446,7 @@ public sealed class PdfExportService : IPdfExportService
                     {
                         string pageName = p.cover ? "Front Cover" :
                                       p.backCover ? "Back Cover" :
-                                      new DateTime(project.Year, ((project.StartMonth - 1 + p.idx) % 12) + 1, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                                      project.GetMonthDate(p.idx).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
                         progress.Report(new ExportProgress
                         {
                             CurrentPage = currentCompleted,
@@ -674,9 +674,8 @@ public sealed class PdfExportService : IPdfExportService
             return (project.Year - 1, 12);
         }
 
-        int month = ((project.StartMonth - 1 + monthIndex) % 12) + 1;
-        int year = project.Year + (project.StartMonth - 1 + monthIndex) / 12;
-        return (year, month);
+        DateTime date = project.GetMonthDate(monthIndex);
+        return (date.Year, date.Month);
     }
 
     private static bool IsMonthPageBorderless(CalendarProject project)

@@ -31,7 +31,7 @@ public sealed class ImageAsset
     public string Role { get; set; } = "monthPhoto";
 
     /// <summary>
-    /// Gets or sets the month index for this image (0-11 for months, null for cover).
+    /// Gets or sets the month index for this image (0 to MonthCount - 1 for months relative to StartMonth, -2 for the previous December, null for cover).
     /// </summary>
     public int? MonthIndex { get; set; }
 

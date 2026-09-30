@@ -32,7 +32,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     private CalendarProject? _project;
 
     [ObservableProperty]
-    private int _pageIndex = -1; // -1=Front Cover, 0-11=Months, 12=Back Cover
+    private int _pageIndex = -1; // -2=Previous December, -1=Front Cover, 0..MonthCount-1=Months, MonthCount=Back Cover
 
     [ObservableProperty]
     private int _activeSlotIndex = 0;
@@ -66,6 +66,20 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     [ObservableProperty]
     private string _yearText = DateTime.Now.Year.ToString();
+
+    #endregion
+
+    #region Page Navigation
+
+    /// <summary>
+    /// Gets the page index of the back cover, which follows the project's last month page.
+    /// </summary>
+    public int BackCoverPageIndex => Project?.BackCoverPageIndex ?? 12;
+
+    /// <summary>
+    /// Gets a value indicating whether the back cover is the current page.
+    /// </summary>
+    public bool IsBackCoverPage => PageIndex == BackCoverPageIndex;
 
     #endregion
 
@@ -229,7 +243,7 @@ public sealed partial class DesignerViewModel : ObservableObject
             return Project.ImageAssets.FirstOrDefault(a =>
                 a.Role == "coverPhoto" && (a.SlotIndex ?? 0) == ActiveSlotIndex);
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             return Project.ImageAssets.FirstOrDefault(a =>
     a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == ActiveSlotIndex);
@@ -276,11 +290,11 @@ public sealed partial class DesignerViewModel : ObservableObject
                 ? layout
                 : Project.LayoutSpec.PhotoLayout;
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             return Project.BackCoverPhotoLayout;
         }
-        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
+        else if (PageIndex >= 0 && PageIndex < Project.MonthCount) // Regular month pages
         {
             return Project.MonthPhotoLayouts.TryGetValue(PageIndex, out var layout)
                 ? layout
@@ -310,15 +324,16 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         PageIndex += direction;
 
-        // Determine page range based on double-sided mode
+        // Determine page range based on double-sided mode and the calendar's month count
         int minPage = Project?.EnableDoubleSided == true ? -2 : -1;
+        int maxPage = BackCoverPageIndex;
 
         if (PageIndex < minPage)
         {
-            PageIndex = 12;
+            PageIndex = maxPage;
         }
 
-        if (PageIndex > 12)
+        if (PageIndex > maxPage)
         {
             PageIndex = minPage;
         }
@@ -381,7 +396,7 @@ public sealed partial class DesignerViewModel : ObservableObject
          {
              role = "coverPhoto";
          }
-         else if (PageIndex == 12)
+         else if (IsBackCoverPage)
          {
              role = "backCoverPhoto";
          }
@@ -504,6 +519,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         }
 
         var modal = new Views.ProjectSettingsModal(Project);
+        bool wasOnBackCover = IsBackCoverPage;
 
         modal.Applied += async (_, __) =>
         {
@@ -511,6 +527,7 @@ public sealed partial class DesignerViewModel : ObservableObject
             {
                 // Update the timestamp to ensure changes are tracked
                 Project.UpdatedUtc = DateTime.UtcNow;
+                EnsurePageIndexInRange(wasOnBackCover);
             }
 
             // Save the updated project
@@ -565,18 +582,18 @@ public sealed partial class DesignerViewModel : ObservableObject
         if (PageIndex == -1)
         {
             bytes = await _pdf.ExportCoverAsync(Project);
-            fileName = $"Calendar_{Project.Year}_FrontCover.pdf";
+            fileName = $"Calendar_{Project.YearRangeDisplay}_FrontCover.pdf";
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             bytes = await _pdf.ExportBackCoverAsync(Project);
-            fileName = $"Calendar_{Project.Year}_BackCover.pdf";
+            fileName = $"Calendar_{Project.YearRangeDisplay}_BackCover.pdf";
         }
         else
         {
             bytes = await _pdf.ExportMonthAsync(Project, PageIndex);
-            var month = ((Project.StartMonth - 1 + PageIndex) % 12) + 1;
-            fileName = $"Calendar_{Project.Year}_{month:00}.pdf";
+            var monthDate = Project.GetMonthDate(PageIndex);
+            fileName = $"Calendar_{monthDate.Year}_{monthDate.Month:00}.pdf";
         }
 
         await SaveBytesAsync(fileName, bytes);
@@ -590,7 +607,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         }
 
         var bytes = await _pdf.ExportCoverAsync(Project);
-        var fileName = $"Calendar_{Project.Year}_Cover.pdf";
+        var fileName = $"Calendar_{Project.YearRangeDisplay}_Cover.pdf";
         await SaveBytesAsync(fileName, bytes);
     }
 
@@ -603,7 +620,7 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         await ExportWithProgressAsync(
                  async (progress, ct) => await _pdf.ExportYearAsync(Project, includeCover: true, progress, ct),
-       $"Calendar_{Project.Year}_FullYear.pdf"
+       $"Calendar_{Project.YearRangeDisplay}_FullYear.pdf"
            );
     }
 
@@ -614,9 +631,17 @@ public sealed partial class DesignerViewModel : ObservableObject
             return;
         }
 
+        if (!Project.SupportsDoubleSided)
+        {
+            await _dialogService.ShowAlertAsync(
+                "Double-Sided Export",
+                "Double-sided calendars must span exactly 12 months. Adjust the start and end dates in Project Settings.");
+            return;
+        }
+
         await ExportWithProgressAsync(
           async (progress, ct) => await _pdf.ExportDoubleSidedAsync(Project, progress, ct),
-               $"Calendar_{Project.Year}_DoubleSided.pdf"
+               $"Calendar_{Project.YearRangeDisplay}_DoubleSided.pdf"
                );
     }
 
@@ -737,11 +762,11 @@ public sealed partial class DesignerViewModel : ObservableObject
             int decemberIndex = Project.StartMonth == 1 ? 11 : 12 - Project.StartMonth;
             Project.MonthPhotoLayouts[decemberIndex] = layout;
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             Project.BackCoverPhotoLayout = layout;
         }
-        else if (PageIndex >= 0 && PageIndex <= 11) // Regular month pages
+        else if (PageIndex >= 0 && PageIndex < Project.MonthCount) // Regular month pages
         {
             Project.MonthPhotoLayouts[PageIndex] = layout;
         }
@@ -819,6 +844,32 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     #region Private Helper Methods
 
+    /// <summary>
+    /// Keeps the current page valid after the project's date range or double-sided setting changes,
+    /// e.g. when the calendar is shortened past the current month page.
+    /// </summary>
+    /// <param name="wasOnBackCover">Whether the back cover was showing before the change, so it stays showing.</param>
+    private void EnsurePageIndexInRange(bool wasOnBackCover)
+    {
+        if (Project == null)
+        {
+            return;
+        }
+
+        if (wasOnBackCover || PageIndex > BackCoverPageIndex)
+        {
+            PageIndex = BackCoverPageIndex;
+        }
+        else if (PageIndex == -2 && !Project.EnableDoubleSided)
+        {
+            PageIndex = -1;
+        }
+
+        ActiveSlotIndex = 0;
+        UpdatePageLabel();
+        SyncZoomUI();
+    }
+
     private void UpdatePageLabel()
     {
         if (Project == null)
@@ -836,15 +887,13 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             PageLabel = "Front Cover";
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             PageLabel = "Back Cover";
         }
         else
         {
-            var month = ((Project.StartMonth - 1 + PageIndex) % 12) + 1;
-            var year = Project.Year + (Project.StartMonth - 1 + PageIndex) / 12;
-            PageLabel = new DateTime(year, month, 1).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            PageLabel = Project.GetMonthDate(PageIndex).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         UpdateControlVisibility();
@@ -853,7 +902,7 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     private void UpdateControlVisibility()
     {
-        bool isCoverOrPrevDec = PageIndex == -2 || PageIndex == -1 || PageIndex == 12;
+        bool isCoverOrPrevDec = PageIndex == -2 || PageIndex == -1 || IsBackCoverPage;
         SplitControlVisible = !isCoverOrPrevDec;
   }
 
@@ -904,15 +953,13 @@ public sealed partial class DesignerViewModel : ObservableObject
         {
             return $"Front Cover - Slot {ActiveSlotIndex + 1}";
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             return $"Back Cover - Slot {ActiveSlotIndex + 1}";
         }
         else
         {
-            var month = ((Project.StartMonth - 1 + PageIndex) % 12) + 1;
-            var year = Project.Year + (Project.StartMonth - 1 + PageIndex) / 12;
-            var monthName = new DateTime(year, month, 1).ToString("MMMM", System.Globalization.CultureInfo.InvariantCulture);
+            var monthName = Project.GetMonthDate(PageIndex).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
             return $"{monthName} - Slot {ActiveSlotIndex + 1}";
         }
     }
@@ -934,7 +981,7 @@ public sealed partial class DesignerViewModel : ObservableObject
                 await _storage.UpdateProjectAsync(Project);
             }
         }
-        else if (PageIndex == 12)
+        else if (IsBackCoverPage)
         {
             var existingPhoto = Project.ImageAssets.FirstOrDefault(a =>
          a.Role == "backCoverPhoto" && (a.SlotIndex ?? 0) == ActiveSlotIndex);

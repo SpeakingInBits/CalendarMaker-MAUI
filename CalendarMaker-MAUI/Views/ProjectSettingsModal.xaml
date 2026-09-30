@@ -165,27 +165,40 @@
             <Label Text="Calendar Settings" 
       FontSize="18" 
            FontAttributes="Bold" />
-            <Label Text="Configure the calendar year, start month, and week settings." 
-       FontSize="12" 
+            <Label Text="Configure the calendar's date range and week settings."
+       FontSize="12"
     TextColor="Gray" />
 
-<!-- Year -->
-            <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
-     <Label Text="Year" VerticalOptions="Center" />
-      <Entry x:Name="YearEntry" 
-                Grid.Column="1"
-       Keyboard="Numeric" 
-     Placeholder="e.g. 2025"
-  VerticalOptions="Center" />
-        </Grid>
+            <!-- Start Date (month + year) -->
+            <Grid ColumnDefinitions="150,*,100" ColumnSpacing="10">
+                <Label Text="Start" VerticalOptions="Center" />
+                <Picker x:Name="StartMonthPicker"
+                        Grid.Column="1"
+                        VerticalOptions="Center" />
+                <Entry x:Name="YearEntry"
+                       Grid.Column="2"
+                       Keyboard="Numeric"
+                       Placeholder="e.g. 2026"
+                       VerticalOptions="Center" />
+            </Grid>
 
-            <!-- Start Month -->
-        <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
-      <Label Text="Start Month" VerticalOptions="Center" />
-         <Picker x:Name="StartMonthPicker"
-   Grid.Column="1"
-    VerticalOptions="Center" />
-        </Grid>
+            <!-- End Date (month + year) -->
+            <Grid ColumnDefinitions="150,*,100" ColumnSpacing="10">
+                <Label Text="End" VerticalOptions="Center" />
+                <Picker x:Name="EndMonthPicker"
+                        Grid.Column="1"
+                        VerticalOptions="Center" />
+                <Entry x:Name="EndYearEntry"
+                       Grid.Column="2"
+                       Keyboard="Numeric"
+                       Placeholder="e.g. 2027"
+                       VerticalOptions="Center" />
+            </Grid>
+
+            <Label x:Name="DateRangeSummaryLabel"
+                   FontSize="11"
+                   TextColor="Gray"
+                   Margin="0,-5,0,0" />
 
          <!-- First Day of Week -->
    <Grid ColumnDefinitions="150,*" ColumnSpacing="10">
