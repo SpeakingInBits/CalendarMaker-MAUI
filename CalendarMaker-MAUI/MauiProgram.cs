@@ -39,6 +39,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<INavigationService, NavigationService>();
         builder.Services.AddSingleton<IFilePickerService, FilePickerService>();
 
+#if WINDOWS
+        // Updates from the GitHub releases; only Windows is released so far.
+        builder.Services.AddSingleton<IAppUpdater, WinUI.AppUpdater>();
+        builder.Services.AddSingleton<AppUpdateCheck>();
+#endif
+
         builder.Services.AddTransient<ProjectsViewModel>();
         builder.Services.AddTransient<Views.ProjectsPage>();
         builder.Services.AddTransient<DesignerViewModel>();
