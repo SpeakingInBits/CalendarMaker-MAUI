@@ -1,0 +1,129 @@
+name: Release
+
+# Run from the Actions tab: builds the Windows app and publishes a GitHub release with the packages.
+on:
+  workflow_dispatch:
+    inputs:
+      change:
+        description: What's in this release (picks the next version number)
+        type: choice
+        options:
+          - Bug fixes
+          - New features
+          - Breaking changes
+        default: Bug fixes
+      version:
+        description: Version number, e.g. 1.0.0 (optional; overrides the calculated one)
+        type: string
+        required: false
+  # Pull requests that change the packaging build every package without releasing, so problems show up before a release.
+  pull_request:
+    branches: [main]
+    paths:
+      - packaging/**
+      - .github/workflows/release.yml
+
+permissions:
+  contents: read
+
+# Two releases at once could pick the same version number.
+concurrency:
+  group: release-${{ github.event_name }}
+
+jobs:
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - name: Only release from main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases are made from main. Choose main in 'Use workflow from'."
+          exit 1
+
+      - uses: actions/checkout@v5
+        with:
+          # The tags are needed to find the latest release.
+          fetch-depth: 0
+
+      - name: Next version
+        id: next
+        env:
+          # Pull requests have no inputs.
+          CHANGE: ${{ inputs.change || 'Bug fixes' }}
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          version=$(bash packaging/next-version.sh "$CHANGE" "$REQUESTED")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$version" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: build
+    needs: version
+    # Only the Windows app is released so far.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install the MAUI workload
+        run: dotnet workload install maui-windows
+
+      # Velopack's packaging tool. Keep its version the same as the Velopack package in CalendarMaker-MAUI.csproj.
+      - name: Install vpk
+        run: dotnet tool install --global vpk --version 1.2.161
+
+      - name: Build and package
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: bash packaging/package.sh win-x64 win-arm64
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: dist/*
+          if-no-files-found: error
+
+  # Pull requests run this too, up to creating the release, so a release-notes link that doesn't match a package shows up
+  # before a release.
+  release:
+    name: release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: dist
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          # vpk also writes assets.<rid>.json (its own list of what it built) and RELEASES-<rid> (an older update list).
+          # The app's updater reads neither, only releases.<rid>.json and the .nupkg, so they'd only clutter the release.
+          rm -f dist/assets.*.json dist/RELEASES-*
+          bash packaging/release-notes.sh dist > notes.md
+
+      - name: Create the release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          # The install instructions come first, then GitHub's list of changes since the last release.
+          # Installed apps update from the newest release's files (releases/latest/download), so this must be marked latest,
+          # which gh does for the highest version.
+          gh release create "v$VERSION" dist/* --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notes.md --generate-notes

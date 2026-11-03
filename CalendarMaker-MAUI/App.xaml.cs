@@ -15,4 +15,13 @@ public partial class App : Application
         var window = new Window(shell);
         return window;
     }
+
+    protected override async void OnStart()
+    {
+        base.OnStart();
+
+        // Only registered on platforms that are released with updates (Windows).
+        if (AppServices.Services.GetService<Services.AppUpdateCheck>() is { } updateCheck)
+            await updateCheck.RunAsync();
+    }
 }

@@ -129,6 +129,20 @@ To build and run CalendarMaker-MAUI, you'll need:
      dotnet run --framework net10.0-windows10.0.19041.0
      ```
 
+### Installing a Release
+
+Download `CalendarMaker-win-x64-Setup.exe` (or `-win-arm64-` for Arm PCs) from the [latest release](https://github.com/SpeakingInBits/CalendarMaker-MAUI/releases/latest). It installs for the current user, no admin needed. After that the app keeps itself up to date: at startup it checks the newest GitHub release, downloads a newer version in the background, and installs it on restart.
+
+### Releasing
+
+Releases are made by the **Release** workflow (`.github/workflows/release.yml`), run by hand from the Actions tab on `main`. It asks whether the release has bug fixes, new features or breaking changes and bumps the patch, minor or major number of the latest `vX.Y.Z` tag (older `vX.Y` tags count as `vX.Y.0`), unless a version is typed in. It then builds `win-x64` and `win-arm64` and publishes a GitHub release with the install instructions from `packaging/release-notes.md`.
+
+- Packaging uses [Velopack](https://velopack.io) (`packaging/package.sh`): a self-contained build (including the Windows App SDK) packed into a `Setup.exe`, a portable zip, and the `.nupkg` and `releases.<rid>.json` that installed apps update from. Each runtime is its own Velopack channel, so an app only updates to its own architecture's package.
+- The app checks `releases/latest/download/` (not the GitHub API, which is rate limited), so every release must be marked latest, which the workflow does for the highest version. Debug builds aren't installed, so they never check.
+- Keep the `Velopack` package version in `CalendarMaker-MAUI.csproj` the same as `vpk` in the workflow.
+- To try an update before releasing it, package two versions locally (`VERSION=x.y.z bash packaging/package.sh win-x64` in Git Bash, with `vpk` installed), install the older one, and start it with `CM_UPDATE_SOURCE` set to the newer one's `dist` folder.
+- The app isn't code-signed, so SmartScreen warns on first run; the release notes explain how to get past it.
+
 ### Platform-Specific Notes
 
 - **Windows**: Fully supported and tested. Primary development platform.
