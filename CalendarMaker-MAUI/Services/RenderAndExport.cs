@@ -641,17 +641,8 @@ public sealed class PdfExportService : IPdfExportService
 
     private static int GetOptimalParallelism()
     {
-        // Detect platform and optimize accordingly
-        int cores = Environment.ProcessorCount;
-
-#if ANDROID || IOS
-        // On mobile devices, use fewer threads to prevent overheating and battery drain
-        // Also helps with memory pressure on constrained devices
-        return Math.Min(cores, 4); // Cap at 4 threads on mobile
-#else
-        // On desktop, use all available cores
-        return cores;
-#endif
+        // Desktop only, so use all available cores
+        return Environment.ProcessorCount;
     }
 
     private void DrawBitmapWithPanZoom(SKCanvas canvas, SKBitmap bmp, SKRect rect, ImageAsset asset)

@@ -97,9 +97,9 @@ To build and run CalendarMaker-MAUI, you'll need:
      - Under "Workloads" tab, check ".NET Multi-platform App UI development"
      - Click "Modify" to install
 
-   - Or install via command line:
+   - Or install via command line (only the Windows part is needed):
      ```bash
-     dotnet workload install maui
+     dotnet workload install maui-windows
      ```
 
 ### Building the Project
@@ -114,14 +114,7 @@ To build and run CalendarMaker-MAUI, you'll need:
    - Open `CalendarMaker-MAUI.sln` in Visual Studio 2022
    - Build project to restore NuGet packages for NuGet packages
 
-3. **Select target platform**
-   - In the toolbar, select your target platform:
-     - **Windows**: `net10.0-windows10.0.19041.0` (Only supported platform currently)
-     - **Android**: `net10.0-android`
-     - **iOS**: `net10.0-ios`
-     - **Mac Catalyst**: `net10.0-maccatalyst`
-
-4. **Build and run**
+3. **Build and run**
    - Press `F5` or click the "Start" button
      - Or build from command line:
      ```bash
@@ -131,9 +124,12 @@ To build and run CalendarMaker-MAUI, you'll need:
 
 ### Platform-Specific Notes
 
-- **Windows**: Fully supported and tested. Primary development platform.
-- **Android**: Not tested yet; build should succeed but functionality may be limited.
-- **iOS/Mac**: Not tested.
+CalendarMaker-MAUI is a desktop app. Each machine builds only its own platform:
+
+- **Windows**: `net10.0-windows10.0.19041.0`. Fully supported and tested. Primary development platform.
+- **Mac Catalyst**: `net10.0-maccatalyst`, built on a Mac. Not tested yet.
+
+Android and iOS aren't targeted.
 
 ### Project Structure
 
@@ -194,7 +190,7 @@ Future enhancements planned:
 - Project import/export as ZIP
 - Custom fonts per project
 - Theming options per project
-- Possible multi-platform support (Mac, iOS, Android)
+- Possible Mac support
 - WYSIWYG designer improvements
 
 ## Contributing
